@@ -9,6 +9,32 @@ let equations = new Map(); // Map to store equations for each variable
 let globalCoefficientCounter = 0; // Global counter for unique coefficients
 let globalKMCounter = 0; // Global counter for Michaelis-Menten constants
 let mathJaxReady = false;
+let isDeleteMode = false;
+let hoveredForDeletion = null; // Can be either a variable or an arrow
+
+// Class to represent equation terms
+class Term {
+    constructor(sourceVar, targetVar, type, isMichaelisMenten = false, km = null) {
+        this.sourceVar = sourceVar; // The variable that's causing the effect
+        this.targetVar = targetVar; // The variable being affected
+        this.type = type; // 'promote' or 'inhibit'
+        this.isMichaelisMenten = isMichaelisMenten;
+        this.km = km;
+    }
+
+    toString() {
+        if (this.isMichaelisMenten) {
+            return this.type === 'promote' ? 
+                `+\\frac{${this.targetVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.sourceVar.text}}` :
+                `-\\frac{${this.targetVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.sourceVar.text}}`;
+        } else {
+            const coefficient = getNextCoefficient();
+            return this.type === 'promote' ? 
+                `+c_{${coefficient}} ${this.sourceVar.text}` : 
+                `-c_{${coefficient}} ${this.sourceVar.text}`;
+        }
+    }
+}
 
 // Wait for MathJax to be ready
 window.addEventListener('load', () => {
@@ -32,9 +58,9 @@ function getNextKM() {
 
 function updateEquationsList() {
     const equationsList = document.getElementById('equationsList');
-    equationsList.innerHTML = Array.from(equations.entries()).map(([variable, equation], index) => `
+    equationsList.innerHTML = Array.from(equations.entries()).map(([variable, terms], index) => `
         <div class="equation-item">
-            <div class="equation-content">$$${equation}$$</div>
+            <div class="equation-content">$$\\frac{d${variable}}{dt}=${terms.map(term => term.toString()).join(' ')}$$</div>
             <button onclick="deleteEquation('${variable}')" class="delete-equation">×</button>
         </div>
     `).join('');
@@ -59,39 +85,26 @@ function updateEquationWithArrow(startVar, endVar, type) {
     console.log('Updating equation:', { startVar, endVar, type });
     console.log('endVar instanceof Arrow:', endVar instanceof Arrow);
     
-    // Get the target variable - either the endVar itself or the end variable of the arrow
+    // Get the target variable for the equation - either the endVar itself or the end variable of the arrow
     const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
-    const currentEquation = equations.get(targetVar.text);
-    console.log('Current equation:', currentEquation);
     
-    const coefficient = getNextCoefficient();
-    let term;
+    // Initialize terms array if it doesn't exist
+    if (!equations.has(targetVar.text)) {
+        equations.set(targetVar.text, []);
+    }
+    
+    const terms = equations.get(targetVar.text);
     
     if (endVar instanceof Arrow) {
         // For arrow-to-arrow connections, use Michaelis-Menten form
         const km = getNextKM();
-        term = type === 'promote' ? 
-            `+\\frac{${endVar.startVariable.text} ${startVar.text}}{k_{${km}} + ${startVar.text}}` :
-            `-\\frac{${endVar.startVariable.text} ${startVar.text}}{k_{${km}} + ${startVar.text}}`;
-        console.log('Created Michaelis-Menten term:', term);
+        // Use the start variable of the arrow for the term format
+        terms.push(new Term(startVar, endVar.startVariable, type, true, km));
     } else {
         // For regular variable connections
-        term = type === 'promote' ? 
-            `+c_{${coefficient}} ${startVar.text}` : 
-            `-c_{${coefficient}} ${startVar.text}`;
-        console.log('Created regular term:', term);
+        terms.push(new Term(startVar, targetVar, type));
     }
     
-    // If equation ends with '=', add a space and remove leading + if it's the first term
-    let newEquation;
-    if (currentEquation.endsWith('=')) {
-        newEquation = currentEquation + ' ' + (type === 'promote' ? term.substring(1) : term);
-    } else {
-        newEquation = currentEquation + ' ' + term;
-    }
-    
-    console.log('New equation:', newEquation);
-    equations.set(targetVar.text, newEquation);
     updateEquationsList();
 }
 
@@ -106,8 +119,8 @@ class ActiveVariable {
         this.dragOffsetY = 0;
         this.isHovered = false;
         
-        // Create initial equation for this variable
-        equations.set(text, `\\frac{d${text}}{dt}=`);
+        // Initialize empty terms array for this variable
+        equations.set(text, []);
         updateEquationsList();
     }
 
@@ -116,16 +129,8 @@ class ActiveVariable {
         ctx.beginPath();
         ctx.arc(this.x + this.radius, this.y + this.radius, this.radius, 0, Math.PI * 2);
         
-        // Set fill color based on hover state
-        if (this.isHovered) {
-            ctx.fillStyle = '#e0e0e0'; // Light grey when hovered
-        } else {
-            ctx.fillStyle = '#ffffff';
-        }
-        
+        // Use the fill style that was set before calling draw
         ctx.fill();
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
         ctx.stroke();
         
         // Draw text
@@ -243,8 +248,6 @@ class Arrow {
                 controlPoint2.x, controlPoint2.y,
                 endPoint.x, endPoint.y
             );
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
             ctx.stroke();
 
             if (this.type === 'promote') {
@@ -264,7 +267,6 @@ class Arrow {
                     endPoint.y - arrowLength * Math.sin(tangentAngle + arrowAngle)
                 );
                 ctx.closePath();
-                ctx.fillStyle = '#000000';
                 ctx.fill();
             } else if (this.type === 'inhibit') {
                 // Draw T-bar
@@ -278,8 +280,6 @@ class Arrow {
                 ctx.beginPath();
                 ctx.moveTo(barX1, barY1);
                 ctx.lineTo(barX2, barY2);
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 4;
                 ctx.stroke();
             }
         } else {
@@ -304,8 +304,6 @@ class Arrow {
             ctx.beginPath();
             ctx.moveTo(startPoint.x, startPoint.y);
             ctx.lineTo(endPoint.x, endPoint.y);
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
             ctx.stroke();
 
             if (this.type === 'promote') {
@@ -323,7 +321,6 @@ class Arrow {
                     endPoint.y - arrowLength * Math.sin(angle + arrowAngle)
                 );
                 ctx.closePath();
-                ctx.fillStyle = '#000000';
                 ctx.fill();
             } else if (this.type === 'inhibit') {
                 // Draw flat bar (T-bar)
@@ -336,8 +333,6 @@ class Arrow {
                 ctx.beginPath();
                 ctx.moveTo(barX1, barY1);
                 ctx.lineTo(barX2, barY2);
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 4;
                 ctx.stroke();
             }
         }
@@ -385,6 +380,7 @@ if (!canvas) {
 
         // Event listeners
         document.getElementById('addTextBox').addEventListener('click', () => {
+            setDeleteMode(false);
             const text = prompt('Enter name for the active variable:', 'New Variable');
             if (text !== null) {
                 let x = 50;
@@ -438,13 +434,37 @@ if (!canvas) {
         }
 
         document.getElementById('drawPromoteArrow').addEventListener('click', () => {
+            setDeleteMode(false);
             setArrowMode(isDrawingArrow && arrowType === 'promote' ? null : 'promote');
         });
         document.getElementById('drawInhibitArrow').addEventListener('click', () => {
+            setDeleteMode(false);
             setArrowMode(isDrawingArrow && arrowType === 'inhibit' ? null : 'inhibit');
         });
 
+        function setDeleteMode(enabled) {
+            isDeleteMode = enabled;
+            isDrawingArrow = false;
+            arrowType = null;
+            // UI feedback
+            const deleteButton = document.getElementById('deleteButton');
+            if (enabled) {
+                deleteButton.classList.add('active');
+            } else {
+                deleteButton.classList.remove('active');
+            }
+            
+            // Update cursor
+            canvas.style.cursor = enabled ? 'crosshair' : 'default';
+        }
+
+        // Add delete button event listener
+        document.getElementById('deleteButton').addEventListener('click', () => {
+            setDeleteMode(!isDeleteMode);
+        });
+
         document.getElementById('clearAll').addEventListener('click', () => {
+            setDeleteMode(false);
             activeVariables = [];
             arrows = [];
             equations.clear();
@@ -525,35 +545,39 @@ if (!canvas) {
             const hoveredVariable = activeVariables.find(variable => variable.isPointInside(x, y));
             const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(x, y) : null;
             
-            if (hoveredVariable) {
-                hoveredVariable.isHovered = true;
-                
-                if (isDrawingArrow && startVariable) {
-                    // If we're drawing an arrow and hovering over a variable
-                    if (connectionExists(startVariable, hoveredVariable)) {
-                        // Show not-allowed cursor if connection already exists
-                        canvas.style.cursor = 'not-allowed';
-                    } else {
-                        // Show crosshair for valid new connections
-                        canvas.style.cursor = 'crosshair';
-                    }
-                } else if (!isDrawingArrow) {
-                    // If we're not drawing an arrow, show move cursor
-                    canvas.style.cursor = 'move';
-                }
-            } else if (hoveredArrow && isDrawingArrow && startVariable) {
-                // If hovering over an arrow while drawing
-                if (connectionExists(startVariable, hoveredArrow)) {
-                    canvas.style.cursor = 'not-allowed';
-                } else {
-                    canvas.style.cursor = 'crosshair';
-                }
-            } else {
-                // If not hovering over any variable or arrow
-                if (isDrawingArrow) {
+            if (isDeleteMode) {
+                hoveredForDeletion = hoveredVariable || hoveredArrow;
+                if (hoveredForDeletion) {
                     canvas.style.cursor = 'crosshair';
                 } else {
                     canvas.style.cursor = 'default';
+                }
+            } else {
+                hoveredForDeletion = null;
+                if (hoveredVariable) {
+                    hoveredVariable.isHovered = true;
+                    
+                    if (isDrawingArrow && startVariable) {
+                        if (connectionExists(startVariable, hoveredVariable)) {
+                            canvas.style.cursor = 'not-allowed';
+                        } else {
+                            canvas.style.cursor = 'crosshair';
+                        }
+                    } else if (!isDrawingArrow) {
+                        canvas.style.cursor = 'move';
+                    }
+                } else if (hoveredArrow && isDrawingArrow && startVariable) {
+                    if (connectionExists(startVariable, hoveredArrow)) {
+                        canvas.style.cursor = 'not-allowed';
+                    } else {
+                        canvas.style.cursor = 'crosshair';
+                    }
+                } else {
+                    if (isDrawingArrow) {
+                        canvas.style.cursor = 'crosshair';
+                    } else {
+                        canvas.style.cursor = 'default';
+                    }
                 }
             }
 
@@ -563,7 +587,6 @@ if (!canvas) {
                 selectedVariable.y = y - selectedVariable.dragOffsetY;
                 redraw();
             } else {
-                // Only redraw if we're not dragging (to show hover effects)
                 redraw();
             }
         });
@@ -583,6 +606,51 @@ if (!canvas) {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+
+            if (isDeleteMode && hoveredForDeletion) {
+                if (hoveredForDeletion instanceof ActiveVariable) {
+                    // Delete all arrows connected to this variable
+                    arrows = arrows.filter(arrow => {
+                        const isConnected = arrow.startVariable === hoveredForDeletion || 
+                                          arrow.endVariable === hoveredForDeletion ||
+                                          (arrow.endVariable instanceof Arrow && 
+                                           arrow.endVariable.endVariable === hoveredForDeletion);
+                        if (isConnected) {
+                            // Remove terms from equations
+                            const targetVar = arrow.endVariable instanceof Arrow ? 
+                                arrow.endVariable.endVariable : arrow.endVariable;
+                            if (equations.has(targetVar.text)) {
+                                const terms = equations.get(targetVar.text);
+                                equations.set(targetVar.text, terms.filter(term => 
+                                    term.sourceVar !== hoveredForDeletion
+                                ));
+                            }
+                        }
+                        return !isConnected;
+                    });
+                    // Delete the variable
+                    activeVariables = activeVariables.filter(v => v !== hoveredForDeletion);
+                    // Delete its equation
+                    equations.delete(hoveredForDeletion.text);
+                    updateEquationsList();
+                } else if (hoveredForDeletion instanceof Arrow) {
+                    // Delete the arrow
+                    arrows = arrows.filter(arrow => arrow !== hoveredForDeletion);
+                    // Update equations
+                    const targetVar = hoveredForDeletion.endVariable instanceof Arrow ? 
+                        hoveredForDeletion.endVariable.endVariable : hoveredForDeletion.endVariable;
+                    if (equations.has(targetVar.text)) {
+                        const terms = equations.get(targetVar.text);
+                        equations.set(targetVar.text, terms.filter(term => 
+                            term.sourceVar !== hoveredForDeletion.startVariable
+                        ));
+                    }
+                    updateEquationsList();
+                }
+                hoveredForDeletion = null;
+                redraw();
+                return;
+            }
 
             if (isDrawingArrow && startVariable) {
                 const endVariable = activeVariables.find(variable => variable.isPointInside(x, y));
@@ -624,10 +692,30 @@ if (!canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Draw arrows
-            arrows.forEach(arrow => arrow.draw(ctx));
+            arrows.forEach(arrow => {
+                if (isDeleteMode && arrow === hoveredForDeletion) {
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 4;
+                } else {
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                }
+                arrow.draw(ctx);
+            });
             
             // Draw active variables
-            activeVariables.forEach(variable => variable.draw(ctx));
+            activeVariables.forEach(variable => {
+                if (isDeleteMode && variable === hoveredForDeletion) {
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 4;
+                    ctx.fillStyle = '#ffcccc'; // Light red fill for hovered variables
+                } else {
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = variable.isHovered ? '#e0e0e0' : '#ffffff';
+                }
+                variable.draw(ctx);
+            });
 
             // Draw grey overlay and connection points when drawing arrows
             if (isDrawingArrow && startVariable) {

@@ -209,4 +209,22 @@ canvas {
 
 .delete-equation:hover {
     background-color: #d32f2f;
+}
+
+#deleteButton {
+    background-color: #ff0000;
+    color: white;
+}
+
+#deleteButton:hover, #deleteButton.active {
+    background-color: #cc0000;
+}
+
+#toggleEquations {
+    background-color: #800080;
+    color: white;
+}
+
+#toggleEquations:hover {
+    background-color: #600060;
 } 
