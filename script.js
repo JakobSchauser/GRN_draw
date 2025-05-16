@@ -62,6 +62,10 @@ function getNextKM() {
 }
 
 function updateEquationsList() {
+    // Reset the counters whenever we update the equations list
+    globalCoefficientCounter = 0; // Reset coefficient counter
+    globalKMCounter = 0; // Reset KM counter
+
     const equationsList = document.getElementById('equationsList');
     equationsList.innerHTML = Array.from(equations.entries()).map(([variable, terms], index) => `
         <div class="equation-item">
@@ -233,26 +237,31 @@ class Arrow {
             const radius = this.startVariable.radius * 1.5;
             const controlPointDistance = this.startVariable.radius * 2.5;
             
+            let baseAngle = (this.type === 'promote') ? 0. : Math.PI;
+            let startAngle = baseAngle - Math.PI / 6;
+            let endAngle = baseAngle + Math.PI / 6;
+
             // Start point (right side of box)
             const startPoint = {
-                x: startCenterX + this.startVariable.radius,
-                y: startCenterY
+                x: startCenterX + this.startVariable.radius * Math.cos(startAngle),
+                y: startCenterY + this.startVariable.radius * Math.sin(startAngle)
             };
             
             // End point (right side of box, slightly below start)
             const endPoint = {
-                x: startCenterX + this.startVariable.radius,
-                y: startCenterY + 10
+                x: startCenterX + this.startVariable.radius * 1.2 * Math.cos(endAngle),
+                y: startCenterY + this.startVariable.radius * 1.2 * Math.sin(endAngle)
             };
             
             // Control points for the curve
             const controlPoint1 = {
-                x: startCenterX + controlPointDistance,
-                y: startCenterY - controlPointDistance
+                x: startCenterX + this.startVariable.radius * 4. * Math.cos(startAngle),
+                y: startCenterY + this.startVariable.radius * 4. * Math.sin(startAngle) // Corrected to sin
             };
+            
             const controlPoint2 = {
-                x: startCenterX + controlPointDistance,
-                y: startCenterY + controlPointDistance
+                x: startCenterX + this.startVariable.radius * 4. * Math.cos(endAngle),
+                y: startCenterY + this.startVariable.radius * 4. * Math.sin(endAngle) // Corrected to sin
             };
             
             // Draw the curve
@@ -264,6 +273,15 @@ class Arrow {
                 endPoint.x, endPoint.y
             );
             ctx.stroke();
+
+            // Draw control points for debugging
+            // ctx.fillStyle = 'red'; // Color for control points
+            // ctx.beginPath();
+            // ctx.arc(controlPoint1.x, controlPoint1.y, 5, 0, Math.PI * 2); // Draw first control point
+            // ctx.fill();
+            // ctx.beginPath();
+            // ctx.arc(controlPoint2.x, controlPoint2.y, 5, 0, Math.PI * 2); // Draw second control point
+            // ctx.fill();
 
             if (this.type === 'promote') {
                 // Draw arrow head
@@ -285,12 +303,14 @@ class Arrow {
                 ctx.fill();
             } else if (this.type === 'inhibit') {
                 // Draw T-bar
+
+
                 const barLength = 18;
-                const barAngle = Math.PI / 2;
-                const barX1 = endPoint.x - (barLength/2);
-                const barY1 = endPoint.y;
-                const barX2 = endPoint.x + (barLength/2);
-                const barY2 = endPoint.y;
+                const barAngle = Math.PI / 1.5;
+                const barX1 = endPoint.x - (barLength/2) * Math.cos(barAngle);
+                const barY1 = endPoint.y - (barLength/2) * Math.sin(barAngle);
+                const barX2 = endPoint.x + (barLength/2) * Math.cos(barAngle);
+                const barY2 = endPoint.y + (barLength/2) * Math.sin(barAngle);
                 
                 ctx.beginPath();
                 ctx.moveTo(barX1, barY1);
@@ -305,6 +325,11 @@ class Arrow {
                 // If connecting to another arrow, use its midpoint
                 endPoint = this.endVariable.getMidpoint();
                 angle = Math.atan2(endPoint.y - startCenterY, endPoint.x - startCenterX);
+                // move slightly back
+                console.log('endPoint:', endPoint);
+                endPoint.x -= Math.cos(angle) * 10;
+                endPoint.y -= Math.sin(angle) * 10;
+                console.log('endPoint:', endPoint);
             } else {
                 // Original code for variable-to-variable connection
                 const endCenterX = this.endVariable.x + this.endVariable.radius;
@@ -512,10 +537,11 @@ if (!canvas) {
         });
 
         // Add a helper function to check if a connection already exists
-        function connectionExists(startVar, endVar) {
+        function connectionExists(startVar, endVar, type) {
             return arrows.some(arrow => 
                 arrow.startVariable === startVar && 
-                arrow.endVariable === endVar
+                arrow.endVariable === endVar && 
+                arrow.type === type // Check if the type is the same
             );
         }
 
@@ -573,7 +599,7 @@ if (!canvas) {
                     hoveredVariable.isHovered = true;
                     
                     if (isDrawingArrow && startVariable) {
-                        if (connectionExists(startVariable, hoveredVariable)) {
+                        if (connectionExists(startVariable, hoveredVariable, arrowType)) {
                             canvas.style.cursor = 'not-allowed';
                         } else {
                             canvas.style.cursor = 'crosshair';
@@ -582,7 +608,7 @@ if (!canvas) {
                         canvas.style.cursor = 'move';
                     }
                 } else if (hoveredArrow && isDrawingArrow && startVariable) {
-                    if (connectionExists(startVariable, hoveredArrow)) {
+                    if (connectionExists(startVariable, hoveredArrow, arrowType)) {
                         canvas.style.cursor = 'not-allowed';
                     } else {
                         canvas.style.cursor = 'crosshair';
@@ -674,7 +700,7 @@ if (!canvas) {
 
                 console.log('Mouseup:', { endVariable, endArrow, target });
 
-                if (target && !connectionExists(startVariable, target) && 
+                if (target && !connectionExists(startVariable, target, arrowType) && 
                     (!endArrow || !sharesStartNode(startVariable, endArrow))) {
                     arrows.push(new Arrow(startVariable, target, arrowType));
                     // Update the equation for the target variable
@@ -744,7 +770,7 @@ if (!canvas) {
                 if (!hoveredVariable) {
                     // Draw variable connection points
                     activeVariables.forEach(variable => {
-                        if (!connectionExists(startVariable, variable)) {
+                        if (!connectionExists(startVariable, variable, arrowType)) {
                             const angle = Math.atan2(
                                 variable.y + variable.radius - (startVariable.y + startVariable.radius),
                                 variable.x + variable.radius - (startVariable.x + startVariable.radius)
@@ -756,7 +782,7 @@ if (!canvas) {
 
                     // Draw arrow midpoints
                     arrows.forEach(arrow => {
-                        if (!connectionExists(startVariable, arrow) && !sharesStartNode(startVariable, arrow)) {
+                        if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
                             const midpoint = arrow.getMidpoint();
                             drawConnectionPoint(midpoint.x, midpoint.y);
                         }
