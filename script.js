@@ -14,13 +14,14 @@ let hoveredForDeletion = null; // Can be either a variable or an arrow
 
 // Class to represent equation terms
 class Term {
-    constructor(sourceVar, targetVar, type, dependentVar = null, isMichaelisMenten = false, km = null) {
+    constructor(sourceVar, targetVar, type, dependentVar = null, isMichaelisMenten = false, km = null, isConstant = false) {
         this.sourceVar = sourceVar; // The variable that's causing the effect
         this.targetVar = targetVar; // The variable being affected
         this.dependentVar = dependentVar; // The dependent variable for Michaelis-Menten
         this.type = type; // 'promote' or 'inhibit'
         this.isMichaelisMenten = isMichaelisMenten;
         this.km = km;
+        this.isConstant = isConstant; // New property to indicate if this term is a constant
     }
 
     toString(isFirstTerm = false) {
@@ -30,13 +31,18 @@ class Term {
                 `-\\frac{${this.dependentVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.dependentVar.text}}`;
             
             return isFirstTerm ? termString : `+${termString}`;
+        } else if (this.isConstant) {
+            const coefficient = getNextCoefficient();
+            return this.type === 'promote' ? 
+                (isFirstTerm ? '' : '+') + `c_{${coefficient}}` : 
+                `-c_{${coefficient}}`;
         } else {
             const coefficient = getNextCoefficient();
             const termString = this.type === 'promote' ? 
-                `c_{${coefficient}} ${this.sourceVar.text}` : 
+                (isFirstTerm ? '' : '+') + `c_{${coefficient}} ${this.sourceVar.text}` : 
                 `-c_{${coefficient}} ${this.sourceVar.text}`;
             
-            return isFirstTerm ? termString : `+${termString}`;
+            return termString;
         }
     }
 }
@@ -827,57 +833,176 @@ if (!canvas) {
             button.textContent = panel.classList.contains('hidden') ? 'Show Equations' : 'Hide Equations';
         });
 
-        // Get the context menu element
-        const contextMenu = document.getElementById('contextMenu');
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get the context menu element
+            const contextMenu = document.getElementById('contextMenu');
+            const addConstantSourceButton = document.getElementById('addConstantSource');
+            const addConstantDegradationButton = document.getElementById('addConstantDegradation');
 
-        // Hide the context menu initially
-        contextMenu.style.display = 'none';
-
-        // Add right-click event listener to the canvas
-        canvas.addEventListener('contextmenu', (e) => {
-            e.preventDefault(); // Prevent the default context menu from appearing
-
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Check if the right-click is on a node
-            const clickedVariable = activeVariables.find(variable => variable.isPointInside(x, y));
-            if (clickedVariable) {
-                // Show the context menu at the mouse position
-                contextMenu.style.left = `${e.clientX}px`;
-                contextMenu.style.top = `${e.clientY}px`;
-                contextMenu.style.display = 'block';
-
-                // Store the clicked variable for later use
-                selectedVariable = clickedVariable;
-            } else {
-                // Hide the context menu if not on a node
-                contextMenu.style.display = 'none';
-            }
-        });
-
-        // Hide the context menu when clicking elsewhere
-        window.addEventListener('click', () => {
+            // Hide the context menu initially
             contextMenu.style.display = 'none';
+
+            // Add right-click event listener to the canvas
+            canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); // Prevent the default context menu from appearing
+
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX; // Global X position
+                const y = e.clientY; // Global Y position
+
+                // Check if the right-click is on a node
+                const clickedVariable = activeVariables.find(variable => variable.isPointInside(x - rect.left, y - rect.top));
+                if (clickedVariable) {
+                    // Adjust the position of the context menu to be closer to the cursor
+                    const offsetX = 30; // Adjust this value as needed
+                    const offsetY = 30; // Adjust this value as needed
+
+                    // Show the context menu at the mouse position with offsets
+                    contextMenu.style.left = `${x - rect.left + offsetX}px`;
+                    contextMenu.style.top  = `${y - rect.top  + offsetY}px`;
+                    contextMenu.style.display = 'block';
+
+                    // Store the clicked variable for later use
+                    selectedVariable = clickedVariable;
+
+                    // Reset button states based on the selected variable
+                    if (hasConstantTerm(selectedVariable, 'promote')) {
+                        addConstantSourceButton.textContent = 'Remove Constant Source';
+                        addConstantSourceButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                    } else {
+                        addConstantSourceButton.textContent = 'Add Constant Source';
+                        addConstantSourceButton.style.backgroundColor = ''; // Reset to default color
+                    }
+
+                    if (hasConstantTerm(selectedVariable, 'inhibit')) {
+                        addConstantDegradationButton.textContent = 'Remove Constant Degradation';
+                        addConstantDegradationButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                    } else {
+                        addConstantDegradationButton.textContent = 'Add Constant Degradation';
+                        addConstantDegradationButton.style.backgroundColor = ''; // Reset to default color
+                    }
+                } else {
+                    // Hide the context menu if not on a node
+                    contextMenu.style.display = 'none';
+                    // Reset button states when context menu is hidden
+                    addConstantSourceButton.textContent = 'Add Constant Source';
+                    addConstantSourceButton.style.backgroundColor = ''; // Reset to default color
+                    addConstantDegradationButton.textContent = 'Add Constant Degradation';
+                    addConstantDegradationButton.style.backgroundColor = ''; // Reset to default color
+                }
+            });
+
+            // Hide the context menu when clicking elsewhere
+            window.addEventListener('click', () => {
+                contextMenu.style.display = 'none';
+                // Reset button states when context menu is hidden
+                addConstantSourceButton.textContent = 'Add Constant Source';
+                addConstantSourceButton.style.backgroundColor = ''; // Reset to default color
+                addConstantDegradationButton.textContent = 'Add Constant Degradation';
+                addConstantDegradationButton.style.backgroundColor = ''; // Reset to default color
+            });
+
+            // Add event listener for adding/removing constant source
+            addConstantSourceButton.addEventListener('click', () => {
+                if (selectedVariable) {
+                    console.log(`Adding constant source to ${selectedVariable.text}`);
+                    
+                    // Check if the constant source already exists
+                    if (hasConstantTerm(selectedVariable, 'promote')) {
+                        console.log('Constant source already exists for this variable.');
+                        // Change button text and color to indicate removal
+                        addConstantSourceButton.textContent = 'Remove Constant Source';
+                        addConstantSourceButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                        
+                        // Remove the existing constant source term
+                        const terms = equations.get(selectedVariable.text);
+                        const termIndex = terms.findIndex(term => term.isConstant && term.type === 'promote');
+                        if (termIndex !== -1) {
+                            terms.splice(termIndex, 1); // Remove the term
+                            equations.set(selectedVariable.text, terms); // Update the equations map
+                            updateEquationsList(); // Update the displayed equations
+                        }
+                    } else {
+                        // If it doesn't exist, add the constant source
+                        if (!equations.has(selectedVariable.text)) {
+                            equations.set(selectedVariable.text, []);
+                        }
+                        
+                        const terms = equations.get(selectedVariable.text);
+                        
+                        // Add the +c term
+                        const constantSourceTerm = new Term(null, selectedVariable, 'promote', null, false, null, true); // Mark as constant
+                        terms.push(constantSourceTerm);
+                        
+                        // Update the equations map
+                        equations.set(selectedVariable.text, terms);
+                        
+                        // Update the equations list to reflect the changes
+                        updateEquationsList();
+                        
+                        // Change button text and color to indicate it has been added
+                        addConstantSourceButton.textContent = 'Remove Constant Source';
+                        addConstantSourceButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                    }
+                }
+                contextMenu.style.display = 'none'; // Hide the context menu after action
+            });
+
+            // Add event listener for adding constant degradation
+            addConstantDegradationButton.addEventListener('click', () => {
+                const addConstantDegradationButton = document.getElementById('addConstantDegradation');
+
+                if (selectedVariable) {
+                    console.log(`Adding constant degradation to ${selectedVariable.text}`);
+                    
+                    // Check if the constant degradation already exists
+                    if (hasConstantTerm(selectedVariable, 'inhibit')) {
+                        console.log('Constant degradation already exists for this variable.');
+                        // Change button text and color to indicate removal
+                        addConstantDegradationButton.textContent = 'Remove Constant Degradation';
+                        addConstantDegradationButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                        
+                        // Remove the existing constant degradation term
+                        const terms = equations.get(selectedVariable.text);
+                        const termIndex = terms.findIndex(term => term.isConstant && term.type === 'inhibit');
+                        if (termIndex !== -1) {
+                            terms.splice(termIndex, 1); // Remove the term
+                            equations.set(selectedVariable.text, terms); // Update the equations map
+                            updateEquationsList(); // Update the displayed equations
+                        }
+                    } else {
+                        // If it doesn't exist, add the constant degradation
+                        if (!equations.has(selectedVariable.text)) {
+                            equations.set(selectedVariable.text, []);
+                        }
+                        
+                        const terms = equations.get(selectedVariable.text);
+                        
+                        // Add the -c term for degradation
+                        const constantDegradationTerm = new Term(null, selectedVariable, 'inhibit', null, false, null, true); // Mark as constant
+                        terms.push(constantDegradationTerm);
+                        
+                        // Update the equations map
+                        equations.set(selectedVariable.text, terms);
+                        
+                        // Update the equations list to reflect the changes
+                        updateEquationsList();
+                        
+                        // Change button text and color to indicate it has been added
+                        addConstantDegradationButton.textContent = 'Remove Constant Degradation';
+                        addConstantDegradationButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                    }
+                }
+                contextMenu.style.display = 'none'; // Hide the context menu after action
+            });
         });
 
-        document.getElementById('addConstantSource').addEventListener('click', () => {
-            if (selectedVariable) {
-                // Implement logic to add a constant source to the selected variable
-                console.log(`Adding constant source to ${selectedVariable.text}`);
-                // Add your logic here
+        function hasConstantTerm(variable, type) {
+            if (equations.has(variable.text)) {
+                const terms = equations.get(variable.text);
+                return terms.some(term => term.isConstant && term.type === type);
             }
-            contextMenu.style.display = 'none'; // Hide the context menu after action
-        });
-
-        document.getElementById('addConstantDegradation').addEventListener('click', () => {
-            if (selectedVariable) {
-                // Implement logic to add a constant degradation to the selected variable
-                console.log(`Adding constant degradation to ${selectedVariable.text}`);
-                // Add your logic here
-            }
-            contextMenu.style.display = 'none'; // Hide the context menu after action
-        });
+            return false;
+        }
     }
 } 

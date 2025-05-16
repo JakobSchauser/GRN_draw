@@ -227,4 +227,30 @@ canvas {
 
 #toggleEquations:hover {
     background-color: #600060;
+}
+
+#contextMenu {
+    display: none; /* Initially hidden */
+    position: absolute; /* Position it absolutely */
+    background: white; /* Background color */
+    border: 1px solid #ccc; /* Border around the menu */
+    border-radius: 4px; /* Rounded corners */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
+    z-index: 1000; /* Ensure it appears above other elements */
+    padding: 10px; /* Padding inside the menu */
+}
+
+#contextMenu button {
+    display: block; /* Stack buttons vertically */
+    width: 100%; /* Make buttons full width */
+    padding: 8px; /* Padding for buttons */
+    border: none; /* Remove default border */
+    background: #d0d0d0; /* Darker background color for buttons */
+    cursor: pointer; /* Pointer cursor on hover */
+    margin: 5px 0; /* Margin between buttons */
+    border-radius: 4px; /* Rounded corners for buttons */
+}
+
+#contextMenu button:hover {
+    background: #b0b0b0; /* Change background on hover to a darker shade */
 } 
