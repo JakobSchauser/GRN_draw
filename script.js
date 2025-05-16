@@ -14,24 +14,29 @@ let hoveredForDeletion = null; // Can be either a variable or an arrow
 
 // Class to represent equation terms
 class Term {
-    constructor(sourceVar, targetVar, type, isMichaelisMenten = false, km = null) {
+    constructor(sourceVar, targetVar, type, dependentVar = null, isMichaelisMenten = false, km = null) {
         this.sourceVar = sourceVar; // The variable that's causing the effect
         this.targetVar = targetVar; // The variable being affected
+        this.dependentVar = dependentVar; // The dependent variable for Michaelis-Menten
         this.type = type; // 'promote' or 'inhibit'
         this.isMichaelisMenten = isMichaelisMenten;
         this.km = km;
     }
 
-    toString() {
+    toString(isFirstTerm = false) {
         if (this.isMichaelisMenten) {
-            return this.type === 'promote' ? 
-                `+\\frac{${this.targetVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.sourceVar.text}}` :
-                `-\\frac{${this.targetVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.sourceVar.text}}`;
+            const termString = this.type === 'promote' ? 
+                `\\frac{${this.dependentVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.dependentVar.text}}` :
+                `-\\frac{${this.dependentVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.dependentVar.text}}`;
+            
+            return isFirstTerm ? termString : `+${termString}`;
         } else {
             const coefficient = getNextCoefficient();
-            return this.type === 'promote' ? 
-                `+c_{${coefficient}} ${this.sourceVar.text}` : 
+            const termString = this.type === 'promote' ? 
+                `c_{${coefficient}} ${this.sourceVar.text}` : 
                 `-c_{${coefficient}} ${this.sourceVar.text}`;
+            
+            return isFirstTerm ? termString : `+${termString}`;
         }
     }
 }
@@ -60,7 +65,7 @@ function updateEquationsList() {
     const equationsList = document.getElementById('equationsList');
     equationsList.innerHTML = Array.from(equations.entries()).map(([variable, terms], index) => `
         <div class="equation-item">
-            <div class="equation-content">$$\\frac{d${variable}}{dt}=${terms.map(term => term.toString()).join(' ')}$$</div>
+            <div class="equation-content">$$\\frac{d${variable}}{dt}=${terms.map((term, i) => term.toString(i === 0)).join(' ')}$$</div>
             <button onclick="deleteEquation('${variable}')" class="delete-equation">×</button>
         </div>
     `).join('');
@@ -93,17 +98,27 @@ function updateEquationWithArrow(startVar, endVar, type) {
         equations.set(targetVar.text, []);
     }
     
-    const terms = equations.get(targetVar.text);
+    let newterms = equations.get(targetVar.text);
     
     if (endVar instanceof Arrow) {
         // For arrow-to-arrow connections, use Michaelis-Menten form
         const km = getNextKM();
-        // Use the start variable of the arrow for the term format
-        terms.push(new Term(startVar, endVar.startVariable, type, true, km));
+        
+        console.log('newterms:', newterms);
+        console.log('startVar:', startVar);
+        console.log('endVar:', endVar); 
+
+        // Remove any existing direct connection term for the same source variable
+        newterms = newterms.filter(term => term.sourceVar !== endVar.startVariable);
+
+        // Create a new Term for the Michaelis-Menten connection
+        newterms.push(new Term(endVar.startVariable, targetVar, type, startVar, true, km));
     } else {
         // For regular variable connections
-        terms.push(new Term(startVar, targetVar, type));
+        newterms.push(new Term(startVar, targetVar, type));
     }
+
+    equations.set(targetVar.text, newterms);
     
     updateEquationsList();
 }
