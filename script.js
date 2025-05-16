@@ -113,10 +113,16 @@ function updateEquationWithArrow(startVar, endVar, type) {
         console.log('endVar:', endVar); 
 
         // Remove any existing direct connection term for the same source variable
+
+        let existing_terms = newterms.filter(term => term.sourceVar === endVar.startVariable);
+
+        
         newterms = newterms.filter(term => term.sourceVar !== endVar.startVariable);
 
+        let type_of_existing = existing_terms[0].type;
+
         // Create a new Term for the Michaelis-Menten connection
-        newterms.push(new Term(endVar.startVariable, targetVar, type, startVar, true, km));
+        newterms.push(new Term(endVar.startVariable, targetVar, type_of_existing, startVar, true, km));
     } else {
         // For regular variable connections
         newterms.push(new Term(startVar, targetVar, type));
@@ -677,6 +683,11 @@ if (!canvas) {
                 } else if (hoveredForDeletion instanceof Arrow) {
                     // Delete the arrow
                     arrows = arrows.filter(arrow => arrow !== hoveredForDeletion);
+
+                    arrows = arrows.filter(arrow => {
+                        return arrow.endVariable !== hoveredForDeletion;
+                    });
+
                     // Update equations
                     const targetVar = hoveredForDeletion.endVariable instanceof Arrow ? 
                         hoveredForDeletion.endVariable.endVariable : hoveredForDeletion.endVariable;
@@ -814,6 +825,59 @@ if (!canvas) {
             const button = document.getElementById('toggleEquations');
             panel.classList.toggle('hidden');
             button.textContent = panel.classList.contains('hidden') ? 'Show Equations' : 'Hide Equations';
+        });
+
+        // Get the context menu element
+        const contextMenu = document.getElementById('contextMenu');
+
+        // Hide the context menu initially
+        contextMenu.style.display = 'none';
+
+        // Add right-click event listener to the canvas
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Prevent the default context menu from appearing
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Check if the right-click is on a node
+            const clickedVariable = activeVariables.find(variable => variable.isPointInside(x, y));
+            if (clickedVariable) {
+                // Show the context menu at the mouse position
+                contextMenu.style.left = `${e.clientX}px`;
+                contextMenu.style.top = `${e.clientY}px`;
+                contextMenu.style.display = 'block';
+
+                // Store the clicked variable for later use
+                selectedVariable = clickedVariable;
+            } else {
+                // Hide the context menu if not on a node
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        // Hide the context menu when clicking elsewhere
+        window.addEventListener('click', () => {
+            contextMenu.style.display = 'none';
+        });
+
+        document.getElementById('addConstantSource').addEventListener('click', () => {
+            if (selectedVariable) {
+                // Implement logic to add a constant source to the selected variable
+                console.log(`Adding constant source to ${selectedVariable.text}`);
+                // Add your logic here
+            }
+            contextMenu.style.display = 'none'; // Hide the context menu after action
+        });
+
+        document.getElementById('addConstantDegradation').addEventListener('click', () => {
+            if (selectedVariable) {
+                // Implement logic to add a constant degradation to the selected variable
+                console.log(`Adding constant degradation to ${selectedVariable.text}`);
+                // Add your logic here
+            }
+            contextMenu.style.display = 'none'; // Hide the context menu after action
         });
     }
 } 
