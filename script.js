@@ -3,6 +3,7 @@ let activeVariables = [];
 let arrows = [];
 let isDrawingArrow = false;
 let selectedVariable = null;
+let selectedArrow = null;
 let startVariable = null;
 let arrowType = null; // 'promote' or 'inhibit'
 let equations = new Map(); // Map to store equations for each variable
@@ -11,6 +12,11 @@ let globalKMCounter = 0; // Global counter for Michaelis-Menten constants
 let mathJaxReady = false;
 let isDeleteMode = false;
 let hoveredForDeletion = null; // Can be either a variable or an arrow
+
+// Track last mouse position and hovered objects
+let lastMouseX = 0;
+let lastMouseY = 0;
+let hoveredForRightClick = null; // Can be either a variable or an arrow
 
 // Class to represent equation terms
 class Term {
@@ -170,6 +176,31 @@ class ActiveVariable {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(this.text, this.x + this.radius, this.y + this.radius);
+
+        // Draw constant source/degradation indicators
+        if (equations.has(this.text)) {
+            const terms = equations.get(this.text);
+            const hasConstantSource = terms.some(term => term.isConstant && term.type === 'promote');
+            const hasConstantDegradation = terms.some(term => term.isConstant && term.type === 'inhibit');
+
+            // Draw constant source indicator (green plus)
+            if (hasConstantSource) {
+                ctx.fillStyle = '#4CAF50'; // Green color
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('+', this.x + this.radius, this.y + this.radius - 25);
+            }
+
+            // Draw constant degradation indicator (red minus)
+            if (hasConstantDegradation) {
+                ctx.fillStyle = '#f44336'; // Red color
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('−', this.x + this.radius, this.y + this.radius + 25);
+            }
+        }
     }
 
     isPointInside(x, y) {
@@ -212,6 +243,7 @@ class Arrow {
         this.type = type;
         this.isSelfConnecting = startVariable === endVariable;
         this.isArrowToArrow = endVariable instanceof Arrow;
+        this.isDotted = false; // Add property for dotted line
     }
 
     getMidpoint() {
@@ -244,6 +276,13 @@ class Arrow {
         const startCenterX = this.startVariable.x + this.startVariable.radius;
         const startCenterY = this.startVariable.y + this.startVariable.radius;
         
+        // Set line style based on isDotted property
+        if (this.isDotted) {
+            ctx.setLineDash([5, 5]); // 5px dash, 5px gap
+        } else {
+            ctx.setLineDash([]); // Solid line
+        }
+        
         if (this.isSelfConnecting) {
             // For self-connecting arrows, draw a lasso shape
             const radius = this.startVariable.radius * 1.5;
@@ -268,12 +307,12 @@ class Arrow {
             // Control points for the curve
             const controlPoint1 = {
                 x: startCenterX + this.startVariable.radius * 4. * Math.cos(startAngle),
-                y: startCenterY + this.startVariable.radius * 4. * Math.sin(startAngle) // Corrected to sin
+                y: startCenterY + this.startVariable.radius * 4. * Math.sin(startAngle)
             };
             
             const controlPoint2 = {
                 x: startCenterX + this.startVariable.radius * 4. * Math.cos(endAngle),
-                y: startCenterY + this.startVariable.radius * 4. * Math.sin(endAngle) // Corrected to sin
+                y: startCenterY + this.startVariable.radius * 4. * Math.sin(endAngle)
             };
             
             // Draw the curve
@@ -286,14 +325,8 @@ class Arrow {
             );
             ctx.stroke();
 
-            // Draw control points for debugging
-            // ctx.fillStyle = 'red'; // Color for control points
-            // ctx.beginPath();
-            // ctx.arc(controlPoint1.x, controlPoint1.y, 5, 0, Math.PI * 2); // Draw first control point
-            // ctx.fill();
-            // ctx.beginPath();
-            // ctx.arc(controlPoint2.x, controlPoint2.y, 5, 0, Math.PI * 2); // Draw second control point
-            // ctx.fill();
+            // Reset line style before drawing arrow head or T-bar
+            ctx.setLineDash([]);
 
             if (this.type === 'promote') {
                 // Draw arrow head
@@ -315,8 +348,6 @@ class Arrow {
                 ctx.fill();
             } else if (this.type === 'inhibit') {
                 // Draw T-bar
-
-
                 const barLength = 18;
                 const barAngle = Math.PI / 1.5;
                 const barX1 = endPoint.x - (barLength/2) * Math.cos(barAngle);
@@ -334,16 +365,11 @@ class Arrow {
             let angle;
 
             if (this.isArrowToArrow) {
-                // If connecting to another arrow, use its midpoint
                 endPoint = this.endVariable.getMidpoint();
                 angle = Math.atan2(endPoint.y - startCenterY, endPoint.x - startCenterX);
-                // move slightly back
-                console.log('endPoint:', endPoint);
                 endPoint.x -= Math.cos(angle) * 10;
                 endPoint.y -= Math.sin(angle) * 10;
-                console.log('endPoint:', endPoint);
             } else {
-                // Original code for variable-to-variable connection
                 const endCenterX = this.endVariable.x + this.endVariable.radius;
                 const endCenterY = this.endVariable.y + this.endVariable.radius;
                 angle = Math.atan2(endCenterY - startCenterY, endCenterX - startCenterX);
@@ -357,6 +383,9 @@ class Arrow {
             ctx.moveTo(startPoint.x, startPoint.y);
             ctx.lineTo(endPoint.x, endPoint.y);
             ctx.stroke();
+
+            // Reset line style before drawing arrow head or T-bar
+            ctx.setLineDash([]);
 
             if (this.type === 'promote') {
                 // Draw arrow head
@@ -577,11 +606,7 @@ if (!canvas) {
             return null;
         }
 
-        // Track last mouse position
-        let lastMouseX = 0;
-        let lastMouseY = 0;
-
-        // Update mousemove to track position
+        // Update mousemove to track position and handle hover effects
         canvas.addEventListener('mousemove', (e) => {
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
@@ -598,8 +623,11 @@ if (!canvas) {
             const hoveredVariable = activeVariables.find(variable => variable.isPointInside(x, y));
             const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(x, y) : null;
             
+            // Update hoveredForRightClick
+            hoveredForRightClick = hoveredVariable || hoveredArrow;
+            
             if (isDeleteMode) {
-                hoveredForDeletion = hoveredVariable || hoveredArrow;
+                hoveredForDeletion = hoveredForRightClick;
                 if (hoveredForDeletion) {
                     canvas.style.cursor = 'crosshair';
                 } else {
@@ -628,6 +656,8 @@ if (!canvas) {
                 } else {
                     if (isDrawingArrow) {
                         canvas.style.cursor = 'crosshair';
+                    } else if (hoveredForRightClick) {
+                        canvas.style.cursor = 'context-menu';
                     } else {
                         canvas.style.cursor = 'default';
                     }
@@ -754,6 +784,9 @@ if (!canvas) {
                 if (isDeleteMode && arrow === hoveredForDeletion) {
                     ctx.strokeStyle = '#ff0000';
                     ctx.lineWidth = 4;
+                } else if (arrow === hoveredForRightClick) {
+                    ctx.strokeStyle = '#2196F3'; // Blue highlight for hover
+                    ctx.lineWidth = 3;
                 } else {
                     ctx.strokeStyle = '#000000';
                     ctx.lineWidth = 2;
@@ -767,6 +800,10 @@ if (!canvas) {
                     ctx.strokeStyle = '#ff0000';
                     ctx.lineWidth = 4;
                     ctx.fillStyle = '#ffcccc'; // Light red fill for hovered variables
+                } else if (variable === hoveredForRightClick) {
+                    ctx.strokeStyle = '#2196F3'; // Blue highlight for hover
+                    ctx.lineWidth = 3;
+                    ctx.fillStyle = '#e3f2fd'; // Light blue fill for hover
                 } else {
                     ctx.strokeStyle = '#000000';
                     ctx.lineWidth = 2;
@@ -834,13 +871,16 @@ if (!canvas) {
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Get the context menu element
+            // Get the context menu elements
             const contextMenu = document.getElementById('contextMenu');
+            const arrowContextMenu = document.getElementById('arrowContextMenu');
             const addConstantSourceButton = document.getElementById('addConstantSource');
             const addConstantDegradationButton = document.getElementById('addConstantDegradation');
+            const toggleDottedButton = document.getElementById('toggleDotted');
 
-            // Hide the context menu initially
+            // Hide the context menus initially
             contextMenu.style.display = 'none';
+            arrowContextMenu.style.display = 'none';
 
             // Add right-click event listener to the canvas
             canvas.addEventListener('contextmenu', (e) => {
@@ -849,46 +889,54 @@ if (!canvas) {
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX; // Global X position
                 const y = e.clientY; // Global Y position
+                const canvasX = x - rect.left;
+                const canvasY = y - rect.top;
 
-                // Check if the right-click is on a node
-                const clickedVariable = activeVariables.find(variable => variable.isPointInside(x - rect.left, y - rect.top));
+                // Check if the right-click is on a node or arrow
+                const clickedVariable = activeVariables.find(variable => variable.isPointInside(canvasX, canvasY));
+                const clickedArrow = !clickedVariable ? findArrowUnderPoint(canvasX, canvasY) : null;
+
                 if (clickedVariable) {
-                    // Adjust the position of the context menu to be closer to the cursor
-                    const offsetX = 30; // Adjust this value as needed
-                    const offsetY = 30; // Adjust this value as needed
-
-                    // Show the context menu at the mouse position with offsets
-                    contextMenu.style.left = `${x - rect.left + offsetX}px`;
-                    contextMenu.style.top  = `${y - rect.top  + offsetY}px`;
+                    // Show variable context menu
+                    contextMenu.style.left = `${x-100}px`;
+                    contextMenu.style.top = `${y-60}px`;
                     contextMenu.style.display = 'block';
-
-                    // Store the clicked variable for later use
+                    arrowContextMenu.style.display = 'none';
                     selectedVariable = clickedVariable;
 
                     // Reset button states based on the selected variable
                     if (hasConstantTerm(selectedVariable, 'promote')) {
                         addConstantSourceButton.textContent = 'Remove Constant Source';
-                        addConstantSourceButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                        addConstantSourceButton.style.backgroundColor = '#ff9800';
                     } else {
                         addConstantSourceButton.textContent = 'Add Constant Source';
-                        addConstantSourceButton.style.backgroundColor = ''; // Reset to default color
+                        addConstantSourceButton.style.backgroundColor = '';
                     }
 
                     if (hasConstantTerm(selectedVariable, 'inhibit')) {
                         addConstantDegradationButton.textContent = 'Remove Constant Degradation';
-                        addConstantDegradationButton.style.backgroundColor = '#ff9800'; // Change to a different color
+                        addConstantDegradationButton.style.backgroundColor = '#ff9800';
                     } else {
                         addConstantDegradationButton.textContent = 'Add Constant Degradation';
-                        addConstantDegradationButton.style.backgroundColor = ''; // Reset to default color
+                        addConstantDegradationButton.style.backgroundColor = '';
                     }
-                } else {
-                    // Hide the context menu if not on a node
+                } else if (clickedArrow) {
+                    // Show arrow context menu
+                    arrowContextMenu.style.left = `${x-100}px`;
+                    arrowContextMenu.style.top = `${y-60}px`;
+                    arrowContextMenu.style.display = 'block';
                     contextMenu.style.display = 'none';
-                    // Reset button states when context menu is hidden
-                    addConstantSourceButton.textContent = 'Add Constant Source';
-                    addConstantSourceButton.style.backgroundColor = ''; // Reset to default color
-                    addConstantDegradationButton.textContent = 'Add Constant Degradation';
-                    addConstantDegradationButton.style.backgroundColor = ''; // Reset to default color
+                    
+                    // Update button text based on current state
+                    toggleDottedButton.textContent = clickedArrow.isDotted ? 'Make Solid' : 'Make Dotted';
+                    toggleDottedButton.style.backgroundColor = clickedArrow.isDotted ? '#ff9800' : '';
+                    
+                    // Store the clicked arrow for later use
+                    selectedArrow = clickedArrow;
+                } else {
+                    // Hide both context menus if not clicking on a node or arrow
+                    contextMenu.style.display = 'none';
+                    arrowContextMenu.style.display = 'none';
                 }
             });
 
@@ -897,9 +945,9 @@ if (!canvas) {
                 contextMenu.style.display = 'none';
                 // Reset button states when context menu is hidden
                 addConstantSourceButton.textContent = 'Add Constant Source';
-                addConstantSourceButton.style.backgroundColor = ''; // Reset to default color
+                addConstantSourceButton.style.backgroundColor = '';
                 addConstantDegradationButton.textContent = 'Add Constant Degradation';
-                addConstantDegradationButton.style.backgroundColor = ''; // Reset to default color
+                addConstantDegradationButton.style.backgroundColor = '';
             });
 
             // Add event listener for adding/removing constant source
@@ -994,6 +1042,17 @@ if (!canvas) {
                     }
                 }
                 contextMenu.style.display = 'none'; // Hide the context menu after action
+            });
+
+            // Add event listener for toggling dotted line
+            toggleDottedButton.addEventListener('click', () => {
+                if (selectedArrow) {
+                    selectedArrow.isDotted = !selectedArrow.isDotted;
+                    toggleDottedButton.textContent = selectedArrow.isDotted ? 'Make Solid' : 'Make Dotted';
+                    toggleDottedButton.style.backgroundColor = selectedArrow.isDotted ? '#ff9800' : '';
+                    redraw();
+                }
+                arrowContextMenu.style.display = 'none';
             });
         });
 
