@@ -243,14 +243,14 @@ class Arrow {
         this.type = type;
         this.isSelfConnecting = startVariable === endVariable;
         this.isArrowToArrow = endVariable instanceof Arrow;
-        this.isDotted = false; // Add property for dotted line
+        this.isDotted = false;
+        this.color = '#000000'; // Default black color
     }
 
     getMidpoint() {
         if (this.isSelfConnecting) {
             const startCenterX = this.startVariable.x + this.startVariable.radius;
             const startCenterY = this.startVariable.y + this.startVariable.radius;
-            const radius = this.startVariable.radius * 1.5;
             const controlPointDistance = this.startVariable.radius * 2.5;
             
             // Calculate midpoint of the self-connecting curve
@@ -272,151 +272,152 @@ class Arrow {
         }
     }
 
+    // Helper method to draw arrow head
+    drawArrowHead(ctx, endPoint, angle) {
+        const arrowLength = 15;
+        const arrowAngle = Math.PI / 6;
+        
+        // Set color for arrow head
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath();
+        ctx.moveTo(endPoint.x, endPoint.y);
+        ctx.lineTo(
+            endPoint.x - arrowLength * Math.cos(angle - arrowAngle),
+            endPoint.y - arrowLength * Math.sin(angle - arrowAngle)
+        );
+        ctx.lineTo(
+            endPoint.x - arrowLength * Math.cos(angle + arrowAngle),
+            endPoint.y - arrowLength * Math.sin(angle + arrowAngle)
+        );
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // Helper method to draw T-bar
+    drawTBar(ctx, endPoint, angle) {
+        const barLength = 18;
+        const barAngle = Math.PI / 2;
+        const barX1 = endPoint.x - (barLength/2) * Math.cos(angle - barAngle);
+        const barY1 = endPoint.y - (barLength/2) * Math.sin(angle - barAngle);
+        const barX2 = endPoint.x + (barLength/2) * Math.cos(angle - barAngle);
+        const barY2 = endPoint.y + (barLength/2) * Math.sin(angle - barAngle);
+        
+        // Set color for T-bar
+        ctx.strokeStyle = this.color;
+        
+        ctx.beginPath();
+        ctx.moveTo(barX1, barY1);
+        ctx.lineTo(barX2, barY2);
+        ctx.stroke();
+    }
+
+    // Helper method to draw self-connecting curve
+    drawSelfConnectingCurve(ctx, startCenterX, startCenterY) {
+        const radius = this.startVariable.radius * 1.5;
+        let baseAngle = (this.type === 'promote') ? 0. : Math.PI;
+        let startAngle = baseAngle - Math.PI / 6;
+        let endAngle = baseAngle + Math.PI / 6;
+
+        // Calculate points
+        const startPoint = {
+            x: startCenterX + this.startVariable.radius * Math.cos(startAngle),
+            y: startCenterY + this.startVariable.radius * Math.sin(startAngle)
+        };
+        
+        const endPoint = {
+            x: startCenterX + this.startVariable.radius * 1.2 * Math.cos(endAngle),
+            y: startCenterY + this.startVariable.radius * 1.2 * Math.sin(endAngle)
+        };
+        
+        const controlPoint1 = {
+            x: startCenterX + this.startVariable.radius * 4. * Math.cos(startAngle),
+            y: startCenterY + this.startVariable.radius * 4. * Math.sin(startAngle)
+        };
+        
+        const controlPoint2 = {
+            x: startCenterX + this.startVariable.radius * 4. * Math.cos(endAngle),
+            y: startCenterY + this.startVariable.radius * 4. * Math.sin(endAngle)
+        };
+        
+        // Set color for curve
+        ctx.strokeStyle = this.color;
+        
+        // Draw the curve
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.bezierCurveTo(
+            controlPoint1.x, controlPoint1.y,
+            controlPoint2.x, controlPoint2.y,
+            endPoint.x, endPoint.y
+        );
+        ctx.stroke();
+
+        // Draw arrow head or T-bar
+        if (this.type === 'promote') {
+            const tangentAngle = 2*Math.PI *7/12;
+            this.drawArrowHead(ctx, endPoint, tangentAngle);
+        } else {
+            const barAngle = Math.PI*1.15;
+            this.drawTBar(ctx, endPoint, barAngle);
+        }
+
+        return endPoint;
+    }
+
+    // Helper method to draw straight line
+    drawStraightLine(ctx, startCenterX, startCenterY) {
+        let endPoint, angle;
+
+        if (this.isArrowToArrow) {
+            endPoint = this.endVariable.getMidpoint();
+            angle = Math.atan2(endPoint.y - startCenterY, endPoint.x - startCenterX);
+            endPoint.x -= Math.cos(angle) * 10;
+            endPoint.y -= Math.sin(angle) * 10;
+        } else {
+            const endCenterX = this.endVariable.x + this.endVariable.radius;
+            const endCenterY = this.endVariable.y + this.endVariable.radius;
+            angle = Math.atan2(endCenterY - startCenterY, endCenterX - startCenterX);
+            endPoint = this.endVariable.getIntersectionPoint(angle + Math.PI);
+        }
+
+        const startPoint = this.startVariable.getIntersectionPoint(angle);
+
+        // Set color for line
+        ctx.strokeStyle = this.color;
+
+        // Draw line
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.lineTo(endPoint.x, endPoint.y);
+        ctx.stroke();
+
+        // Draw arrow head or T-bar
+        if (this.type === 'promote') {
+            this.drawArrowHead(ctx, endPoint, angle);
+        } else {
+            this.drawTBar(ctx, endPoint, angle);
+        }
+
+        return endPoint;
+    }
+
     draw(ctx) {
         const startCenterX = this.startVariable.x + this.startVariable.radius;
         const startCenterY = this.startVariable.y + this.startVariable.radius;
         
         // Set line style based on isDotted property
-        if (this.isDotted) {
-            ctx.setLineDash([5, 5]); // 5px dash, 5px gap
+        ctx.setLineDash(this.isDotted ? [5, 5] : []);
+        
+        // Draw the main line
+        if (this.isSelfConnecting) {
+            this.drawSelfConnectingCurve(ctx, startCenterX, startCenterY);
         } else {
-            ctx.setLineDash([]); // Solid line
+            this.drawStraightLine(ctx, startCenterX, startCenterY);
         }
         
-        if (this.isSelfConnecting) {
-            // For self-connecting arrows, draw a lasso shape
-            const radius = this.startVariable.radius * 1.5;
-            const controlPointDistance = this.startVariable.radius * 2.5;
-            
-            let baseAngle = (this.type === 'promote') ? 0. : Math.PI;
-            let startAngle = baseAngle - Math.PI / 6;
-            let endAngle = baseAngle + Math.PI / 6;
-
-            // Start point (right side of box)
-            const startPoint = {
-                x: startCenterX + this.startVariable.radius * Math.cos(startAngle),
-                y: startCenterY + this.startVariable.radius * Math.sin(startAngle)
-            };
-            
-            // End point (right side of box, slightly below start)
-            const endPoint = {
-                x: startCenterX + this.startVariable.radius * 1.2 * Math.cos(endAngle),
-                y: startCenterY + this.startVariable.radius * 1.2 * Math.sin(endAngle)
-            };
-            
-            // Control points for the curve
-            const controlPoint1 = {
-                x: startCenterX + this.startVariable.radius * 4. * Math.cos(startAngle),
-                y: startCenterY + this.startVariable.radius * 4. * Math.sin(startAngle)
-            };
-            
-            const controlPoint2 = {
-                x: startCenterX + this.startVariable.radius * 4. * Math.cos(endAngle),
-                y: startCenterY + this.startVariable.radius * 4. * Math.sin(endAngle)
-            };
-            
-            // Draw the curve
-            ctx.beginPath();
-            ctx.moveTo(startPoint.x, startPoint.y);
-            ctx.bezierCurveTo(
-                controlPoint1.x, controlPoint1.y,
-                controlPoint2.x, controlPoint2.y,
-                endPoint.x, endPoint.y
-            );
-            ctx.stroke();
-
-            // Reset line style before drawing arrow head or T-bar
-            ctx.setLineDash([]);
-
-            if (this.type === 'promote') {
-                // Draw arrow head
-                const arrowLength = 15;
-                const arrowAngle = Math.PI / 6;
-                const tangentAngle = 2*Math.PI *7/12;
-                
-                ctx.beginPath();
-                ctx.moveTo(endPoint.x, endPoint.y);
-                ctx.lineTo(
-                    endPoint.x - arrowLength * Math.cos(tangentAngle - arrowAngle),
-                    endPoint.y - arrowLength * Math.sin(tangentAngle - arrowAngle)
-                );
-                ctx.lineTo(
-                    endPoint.x - arrowLength * Math.cos(tangentAngle + arrowAngle),
-                    endPoint.y - arrowLength * Math.sin(tangentAngle + arrowAngle)
-                );
-                ctx.closePath();
-                ctx.fill();
-            } else if (this.type === 'inhibit') {
-                // Draw T-bar
-                const barLength = 18;
-                const barAngle = Math.PI / 1.5;
-                const barX1 = endPoint.x - (barLength/2) * Math.cos(barAngle);
-                const barY1 = endPoint.y - (barLength/2) * Math.sin(barAngle);
-                const barX2 = endPoint.x + (barLength/2) * Math.cos(barAngle);
-                const barY2 = endPoint.y + (barLength/2) * Math.sin(barAngle);
-                
-                ctx.beginPath();
-                ctx.moveTo(barX1, barY1);
-                ctx.lineTo(barX2, barY2);
-                ctx.stroke();
-            }
-        } else {
-            let endPoint;
-            let angle;
-
-            if (this.isArrowToArrow) {
-                endPoint = this.endVariable.getMidpoint();
-                angle = Math.atan2(endPoint.y - startCenterY, endPoint.x - startCenterX);
-                endPoint.x -= Math.cos(angle) * 10;
-                endPoint.y -= Math.sin(angle) * 10;
-            } else {
-                const endCenterX = this.endVariable.x + this.endVariable.radius;
-                const endCenterY = this.endVariable.y + this.endVariable.radius;
-                angle = Math.atan2(endCenterY - startCenterY, endCenterX - startCenterX);
-                endPoint = this.endVariable.getIntersectionPoint(angle + Math.PI);
-            }
-
-            const startPoint = this.startVariable.getIntersectionPoint(angle);
-
-            // Draw line
-            ctx.beginPath();
-            ctx.moveTo(startPoint.x, startPoint.y);
-            ctx.lineTo(endPoint.x, endPoint.y);
-            ctx.stroke();
-
-            // Reset line style before drawing arrow head or T-bar
-            ctx.setLineDash([]);
-
-            if (this.type === 'promote') {
-                // Draw arrow head
-                const arrowLength = 15;
-                const arrowAngle = Math.PI / 6;
-                ctx.beginPath();
-                ctx.moveTo(endPoint.x, endPoint.y);
-                ctx.lineTo(
-                    endPoint.x - arrowLength * Math.cos(angle - arrowAngle),
-                    endPoint.y - arrowLength * Math.sin(angle - arrowAngle)
-                );
-                ctx.lineTo(
-                    endPoint.x - arrowLength * Math.cos(angle + arrowAngle),
-                    endPoint.y - arrowLength * Math.sin(angle + arrowAngle)
-                );
-                ctx.closePath();
-                ctx.fill();
-            } else if (this.type === 'inhibit') {
-                // Draw flat bar (T-bar)
-                const barLength = 18;
-                const barAngle = Math.PI / 2;
-                const barX1 = endPoint.x - (barLength/2) * Math.cos(angle - barAngle);
-                const barY1 = endPoint.y - (barLength/2) * Math.sin(angle - barAngle);
-                const barX2 = endPoint.x + (barLength/2) * Math.cos(angle - barAngle);
-                const barY2 = endPoint.y + (barLength/2) * Math.sin(angle - barAngle);
-                ctx.beginPath();
-                ctx.moveTo(barX1, barY1);
-                ctx.lineTo(barX2, barY2);
-                ctx.stroke();
-            }
-        }
+        // Reset line style
+        ctx.setLineDash([]);
     }
 }
 
