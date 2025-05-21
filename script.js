@@ -18,6 +18,9 @@ let lastMouseX = 0;
 let lastMouseY = 0;
 let hoveredForRightClick = null; // Can be either a variable or an arrow
 
+// Add at the top of the file, after the state management variables
+let andGroupColors = new Map(); // Map to store colors for AND logic groups
+
 // Class to represent equation terms
 class Term {
     constructor(sourceVar, targetVar, type, dependentVar = null, isMichaelisMenten = false, km = null, isConstant = false) {
@@ -28,28 +31,61 @@ class Term {
         this.isMichaelisMenten = isMichaelisMenten;
         this.km = km;
         this.isConstant = isConstant; // New property to indicate if this term is a constant
+        this.logicGroup = null; // Group ID for AND/OR logic
+        this.logicType = null; // 'and' or 'or'
     }
 
     toString(isFirstTerm = false) {
-        if (this.isMichaelisMenten) {
-            const termString = this.type === 'promote' ? 
-                `\\frac{${this.dependentVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.dependentVar.text}}` :
-                `-\\frac{${this.dependentVar.text} ${this.sourceVar.text}}{k_{${this.km}} + ${this.dependentVar.text}}`;
+        // If this term is part of a logic group, only the first term in the group should render
+        if (this.logicGroup !== null) {
+            const terms = Array.from(equations.get(this.targetVar.text))
+                .filter(t => t.logicGroup === this.logicGroup);
             
-            return isFirstTerm ? termString : `+${termString}`;
-        } else if (this.isConstant) {
+            // Only render if this is the first term in the group
+            if (terms[0] !== this) {
+                return '';
+            }
+            
+            if (terms.length > 1) {
+                const termStringsWithoutCoefficient = terms.map(t => {
+                    if (t.isConstant) {
+                    const constant = getNextCoefficient();
+                        return t.type === 'promote' ? 
+                            `c_{${constant}}` : 
+                `-c_{${constant}}`;
+        } else {
+            return t.type === 'promote' ? 
+            `\\frac{${t.sourceVar.text}^h}{k_${getNextKM()} + ${t.sourceVar.text}^h}` : 
+            `\\frac{1}{1 + ${t.sourceVar.text}^h}`;
+        }
+    });
+    
+                const coefficient = getNextCoefficient();
+                const termString = this.logicType === 'and' ? 
+                termStringsWithoutCoefficient.join(' \\cdot ') : 
+                termStringsWithoutCoefficient.join(' + ');
+
+                let termStringWithConstant = `c_{${coefficient}}` + termString;
+                
+                return isFirstTerm ? termStringWithConstant : `+${termStringWithConstant}`;
+            }
+        }
+
+        // Handle individual terms
+        let termString;
+        if (this.isConstant) {
             const coefficient = getNextCoefficient();
-            return this.type === 'promote' ? 
-                (isFirstTerm ? '' : '+') + `c_{${coefficient}}` : 
+            termString = this.type === 'promote' ? 
+                `c_{${coefficient}}` : 
                 `-c_{${coefficient}}`;
         } else {
             const coefficient = getNextCoefficient();
-            const termString = this.type === 'promote' ? 
-                (isFirstTerm ? '' : '+') + `c_{${coefficient}} ${this.sourceVar.text}` : 
-                `-c_{${coefficient}} ${this.sourceVar.text}`;
-            
-            return termString;
+            termString = this.type === 'promote' ? 
+                `c_{${coefficient}} \\frac{${this.sourceVar.text}^h}{k_${getNextKM()} + ${this.sourceVar.text}^h}` : 
+                `c_{${coefficient}} \\frac{1}{1 + ${this.sourceVar.text}^h}`;
         }
+        
+        return isFirstTerm ? termString : `+${termString}`;
     }
 }
 
@@ -73,10 +109,70 @@ function getNextKM() {
     return globalKMCounter;
 }
 
+// Function to calculate equations from scratch based on arrows
+function calculateEquationsFromArrows() {
+    // Clear existing equations
+    equations.clear();
+    
+    // Group arrows by their target variable
+    const arrowsByTarget = new Map();
+    
+    arrows.forEach(arrow => {
+        const targetVar = arrow.endVariable instanceof Arrow ? 
+            arrow.endVariable.endVariable : arrow.endVariable;
+            
+        if (!arrowsByTarget.has(targetVar)) {
+            arrowsByTarget.set(targetVar, []);
+        }
+        arrowsByTarget.get(targetVar).push(arrow);
+    });
+    
+    // For each target variable, create terms from its incoming arrows
+    arrowsByTarget.forEach((incomingArrows, targetVar) => {
+        const terms = [];
+        
+        // Group arrows by their AND groups
+        const andGroups = new Map();
+        incomingArrows.forEach(arrow => {
+            if (arrow.isAndConnection && arrow.andGroupId) {
+                if (!andGroups.has(arrow.andGroupId)) {
+                    andGroups.set(arrow.andGroupId, []);
+                }
+                andGroups.get(arrow.andGroupId).push(arrow);
+            } else {
+                // Single arrow terms
+                terms.push(new Term(arrow.startVariable, targetVar, arrow.type));
+            }
+        });
+        
+        // Add terms for AND groups
+        andGroups.forEach(arrows => {
+            // Create AND group for any number of arrows (including 2)
+            const groupTerms = arrows.map(arrow => 
+                new Term(arrow.startVariable, targetVar, arrow.type)
+            );
+            
+            // Set logic group properties
+            const groupId = arrows[0].andGroupId;
+            groupTerms.forEach(term => {
+                term.logicGroup = groupId;
+                term.logicType = 'and';
+            });
+            
+            terms.push(...groupTerms);
+        });
+        
+        equations.set(targetVar.text, terms);
+    });
+}
+
 function updateEquationsList() {
     // Reset the counters whenever we update the equations list
     globalCoefficientCounter = 0; // Reset coefficient counter
     globalKMCounter = 0; // Reset KM counter
+
+    // Calculate equations from scratch
+    calculateEquationsFromArrows();
 
     const equationsList = document.getElementById('equationsList');
     equationsList.innerHTML = Array.from(equations.entries()).map(([variable, terms], index) => `
@@ -98,50 +194,6 @@ function updateEquationsList() {
 
 function deleteEquation(variable) {
     equations.delete(variable);
-    updateEquationsList();
-}
-
-// Helper function to update equation with new term
-function updateEquationWithArrow(startVar, endVar, type) {
-    console.log('Updating equation:', { startVar, endVar, type });
-    console.log('endVar instanceof Arrow:', endVar instanceof Arrow);
-    
-    // Get the target variable for the equation - either the endVar itself or the end variable of the arrow
-    const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
-    
-    // Initialize terms array if it doesn't exist
-    if (!equations.has(targetVar.text)) {
-        equations.set(targetVar.text, []);
-    }
-    
-    let newterms = equations.get(targetVar.text);
-    
-    if (endVar instanceof Arrow) {
-        // For arrow-to-arrow connections, use Michaelis-Menten form
-        const km = getNextKM();
-        
-        console.log('newterms:', newterms);
-        console.log('startVar:', startVar);
-        console.log('endVar:', endVar); 
-
-        // Remove any existing direct connection term for the same source variable
-
-        let existing_terms = newterms.filter(term => term.sourceVar === endVar.startVariable);
-
-        
-        newterms = newterms.filter(term => term.sourceVar !== endVar.startVariable);
-
-        let type_of_existing = existing_terms[0].type;
-
-        // Create a new Term for the Michaelis-Menten connection
-        newterms.push(new Term(endVar.startVariable, targetVar, type_of_existing, startVar, true, km));
-    } else {
-        // For regular variable connections
-        newterms.push(new Term(startVar, targetVar, type));
-    }
-
-    equations.set(targetVar.text, newterms);
-    
     updateEquationsList();
 }
 
@@ -210,13 +262,14 @@ class ActiveVariable {
         return distance <= this.radius;
     }
 
-    getIntersectionPoint(angle) {
+    getIntersectionPoint(angle, isAndConnection = false) {
         const centerX = this.x + this.radius;
         const centerY = this.y + this.radius;
-        // Move intersection point slightly inward (0.9 of radius)
+        // Move intersection point slightly ourtward (1.1 of radius for regular arrows, 1.2 for AND connections)
+        const factor = isAndConnection ? 1.2 : 1.1;
         return {
-            x: centerX + this.radius * 1.1 * Math.cos(angle),
-            y: centerY + this.radius * 1.1 * Math.sin(angle)
+            x: centerX + this.radius * factor * Math.cos(angle),
+            y: centerY + this.radius * factor * Math.sin(angle)
         };
     }
 
@@ -245,18 +298,87 @@ class Arrow {
         this.isArrowToArrow = endVariable instanceof Arrow;
         this.isDotted = false;
         this.color = '#000000'; // Default black color
+        this.isAndConnection = false; // Flag for AND connections
+        this.andGroupId = null; // Store the AND group ID
+    }
+
+    // Helper method to calculate average angle for multiple arrows
+    calculateAverageAngle(arrow) {
+        // Skip if the arrow isn't part of an AND group
+        if (!arrow.isAndConnection || !arrow.andGroupId) {
+            return null;
+        }
+
+        // Get the target variable
+        const targetVar = arrow.endVariable instanceof Arrow ? 
+            arrow.endVariable.endVariable : arrow.endVariable;
+
+        // Find all arrows in the same AND group
+        const groupArrows = arrows.filter(a => 
+            a.isAndConnection && 
+            a.andGroupId === arrow.andGroupId
+        );
+
+        if (groupArrows.length === 0) {
+            return null;
+        }
+
+        // Calculate angles for each arrow in the group
+        const angles = groupArrows.map(a => {
+            const startCenterX = a.startVariable.x + a.startVariable.radius;
+            const startCenterY = a.startVariable.y + a.startVariable.radius;
+            const endCenterX = targetVar.x + targetVar.radius;
+            const endCenterY = targetVar.y + targetVar.radius;
+            
+            // Calculate angle from start to end
+            let angle = Math.atan2(endCenterY - startCenterY, endCenterX - startCenterX);
+            
+            // Normalize angle to be between -PI and PI
+            while (angle > Math.PI) angle -= 2 * Math.PI;
+            while (angle < -Math.PI) angle += 2 * Math.PI;
+            
+            return angle;
+        });
+
+        // Calculate average angle using vector addition
+        const sumX = angles.reduce((sum, angle) => sum + Math.cos(angle), 0);
+        const sumY = angles.reduce((sum, angle) => sum + Math.sin(angle), 0);
+        let avgAngle = Math.atan2(sumY, sumX);
+
+        // Normalize the average angle
+        while (avgAngle > Math.PI) avgAngle -= 2 * Math.PI;
+        while (avgAngle < -Math.PI) avgAngle += 2 * Math.PI;
+
+        return avgAngle;
     }
 
     getMidpoint() {
         if (this.isSelfConnecting) {
             const startCenterX = this.startVariable.x + this.startVariable.radius;
             const startCenterY = this.startVariable.y + this.startVariable.radius;
-            const controlPointDistance = this.startVariable.radius * 2.5;
             
-            // Calculate midpoint of the self-connecting curve
+            let baseAngle = (this.type === 'promote') ? 0. : Math.PI;
+            let startAngle = baseAngle - Math.PI / 6;
+            let endAngle = baseAngle + Math.PI / 6;
+
+            // a magic number that works with Bezier. Maybe calculate later
+            let magicBezierNumber = 3.3
+
+            // Calculate control points (same as in drawSelfConnectingCurve)
+            const controlPoint1 = {
+                x: startCenterX + this.startVariable.radius * magicBezierNumber * Math.cos(startAngle),
+                y: startCenterY + this.startVariable.radius * magicBezierNumber * Math.sin(startAngle)
+            };
+            
+            const controlPoint2 = {
+                x: startCenterX + this.startVariable.radius * magicBezierNumber * Math.cos(endAngle),
+                y: startCenterY + this.startVariable.radius * magicBezierNumber * Math.sin(endAngle)
+            };
+
+            // Calculate midpoint of the curve using the control points
             return {
-                x: startCenterX + controlPointDistance,
-                y: startCenterY
+                x: (controlPoint1.x + controlPoint2.x) / 2,
+                y: (controlPoint1.y + controlPoint2.y) / 2
             };
         } else {
             const startCenterX = this.startVariable.x + this.startVariable.radius;
@@ -315,47 +437,47 @@ class Arrow {
     // Helper method to draw self-connecting curve
     drawSelfConnectingCurve(ctx, startCenterX, startCenterY) {
         const radius = this.startVariable.radius * 1.5;
-        let baseAngle = (this.type === 'promote') ? 0. : Math.PI;
-        let startAngle = baseAngle - Math.PI / 6;
-        let endAngle = baseAngle + Math.PI / 6;
+            let baseAngle = (this.type === 'promote') ? 0. : Math.PI;
+            let startAngle = baseAngle - Math.PI / 6;
+            let endAngle = baseAngle + Math.PI / 6;
 
         // Calculate points
-        const startPoint = {
-            x: startCenterX + this.startVariable.radius * Math.cos(startAngle),
-            y: startCenterY + this.startVariable.radius * Math.sin(startAngle)
-        };
-        
-        const endPoint = {
-            x: startCenterX + this.startVariable.radius * 1.2 * Math.cos(endAngle),
-            y: startCenterY + this.startVariable.radius * 1.2 * Math.sin(endAngle)
-        };
-        
-        const controlPoint1 = {
-            x: startCenterX + this.startVariable.radius * 4. * Math.cos(startAngle),
+            const startPoint = {
+                x: startCenterX + this.startVariable.radius * Math.cos(startAngle),
+                y: startCenterY + this.startVariable.radius * Math.sin(startAngle)
+            };
+            
+            const endPoint = {
+                x: startCenterX + this.startVariable.radius * 1.2 * Math.cos(endAngle),
+                y: startCenterY + this.startVariable.radius * 1.2 * Math.sin(endAngle)
+            };
+            
+            const controlPoint1 = {
+                x: startCenterX + this.startVariable.radius * 4. * Math.cos(startAngle),
             y: startCenterY + this.startVariable.radius * 4. * Math.sin(startAngle)
-        };
-        
-        const controlPoint2 = {
-            x: startCenterX + this.startVariable.radius * 4. * Math.cos(endAngle),
+            };
+            
+            const controlPoint2 = {
+                x: startCenterX + this.startVariable.radius * 4. * Math.cos(endAngle),
             y: startCenterY + this.startVariable.radius * 4. * Math.sin(endAngle)
-        };
+            };
         
         // Set color for curve
         ctx.strokeStyle = this.color;
-        
-        // Draw the curve
-        ctx.beginPath();
-        ctx.moveTo(startPoint.x, startPoint.y);
-        ctx.bezierCurveTo(
-            controlPoint1.x, controlPoint1.y,
-            controlPoint2.x, controlPoint2.y,
-            endPoint.x, endPoint.y
-        );
-        ctx.stroke();
+            
+            // Draw the curve
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.bezierCurveTo(
+                controlPoint1.x, controlPoint1.y,
+                controlPoint2.x, controlPoint2.y,
+                endPoint.x, endPoint.y
+            );
+            ctx.stroke();
 
         // Draw arrow head or T-bar
-        if (this.type === 'promote') {
-            const tangentAngle = 2*Math.PI *7/12;
+            if (this.type === 'promote') {
+                const tangentAngle = 2*Math.PI *7/12;
             this.drawArrowHead(ctx, endPoint, tangentAngle);
         } else {
             const barAngle = Math.PI*1.15;
@@ -367,40 +489,82 @@ class Arrow {
 
     // Helper method to draw straight line
     drawStraightLine(ctx, startCenterX, startCenterY) {
-        let endPoint, angle;
+        let endPoint, endAngle;
 
         if (this.isArrowToArrow) {
-            endPoint = this.endVariable.getMidpoint();
-            angle = Math.atan2(endPoint.y - startCenterY, endPoint.x - startCenterX);
-            endPoint.x -= Math.cos(angle) * 10;
-            endPoint.y -= Math.sin(angle) * 10;
+            // For arrow-to-arrow connections, we need to find where the target arrow connects
+            const targetArrow = this.endVariable;
+            const targetStartCenterX = targetArrow.startVariable.x + targetArrow.startVariable.radius;
+            const targetStartCenterY = targetArrow.startVariable.y + targetArrow.startVariable.radius;
+            
+            // Calculate the angle to the target arrow's end
+            if (targetArrow.isSelfConnecting) {
+                // For self-connecting arrows, use the end angle of the curve
+                let baseAngle = (targetArrow.type === 'promote') ? 0. : Math.PI;
+                let curveEndAngle = baseAngle + Math.PI / 6;
+                endAngle = curveEndAngle;
+                endPoint = {
+                    x: targetStartCenterX + targetArrow.startVariable.radius * 1.2 * Math.cos(curveEndAngle),
+                    y: targetStartCenterY + targetArrow.startVariable.radius * 1.2 * Math.sin(curveEndAngle)
+                };
         } else {
-            const endCenterX = this.endVariable.x + this.endVariable.radius;
-            const endCenterY = this.endVariable.y + this.endVariable.radius;
-            angle = Math.atan2(endCenterY - startCenterY, endCenterX - startCenterX);
-            endPoint = this.endVariable.getIntersectionPoint(angle + Math.PI);
+                // For regular arrows, calculate angle to the end variable
+                const targetEndCenterX = targetArrow.endVariable.x + targetArrow.endVariable.radius;
+                const targetEndCenterY = targetArrow.endVariable.y + targetArrow.endVariable.radius;
+                endAngle = Math.atan2(targetEndCenterY - targetStartCenterY, targetEndCenterX - targetStartCenterX);
+                
+                // Get the intersection point with the end variable
+                endPoint = targetArrow.endVariable.getIntersectionPoint(endAngle + Math.PI, this.isAndConnection);
+            }
+            } else {
+                const endCenterX = this.endVariable.x + this.endVariable.radius;
+                const endCenterY = this.endVariable.y + this.endVariable.radius;
+        
+            // Try to get average angle for multiple arrows
+            const avgAngle = this.calculateAverageAngle(this);
+            if (avgAngle !== null) {
+                endAngle = avgAngle;
+            } else {
+                endAngle = Math.atan2(endCenterY - startCenterY, endCenterX - startCenterX);
+            }
+            
+            endPoint = this.endVariable.getIntersectionPoint(endAngle + Math.PI, this.isAndConnection);
         }
 
-        const startPoint = this.startVariable.getIntersectionPoint(angle);
+        // Calculate the angle from start to end point for the start intersection
+        const startAngle = Math.atan2(endPoint.y - startCenterY, endPoint.x - startCenterX);
+        const startPoint = this.startVariable.getIntersectionPoint(startAngle, this.isAndConnection);
 
         // Set color for line
         ctx.strokeStyle = this.color;
 
-        // Draw line
-        ctx.beginPath();
-        ctx.moveTo(startPoint.x, startPoint.y);
-        ctx.lineTo(endPoint.x, endPoint.y);
-        ctx.stroke();
+            // Draw line
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.lineTo(endPoint.x, endPoint.y);
+            ctx.stroke();
 
         // Draw arrow head or T-bar
-        if (this.type === 'promote') {
-            this.drawArrowHead(ctx, endPoint, angle);
+            if (this.type === 'promote') {
+            this.drawArrowHead(ctx, endPoint, startAngle);
         } else {
-            this.drawTBar(ctx, endPoint, angle);
+            this.drawTBar(ctx, endPoint, startAngle);
         }
 
         return endPoint;
     }
+
+    // Helper method to draw AND indicator
+    drawAndIndicator(ctx, x, y) {
+        const radius = 4;
+                ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#4C0050'; // Color for AND indicator
+                ctx.fill();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+                ctx.stroke();
+            }
 
     draw(ctx) {
         const startCenterX = this.startVariable.x + this.startVariable.radius;
@@ -409,11 +573,26 @@ class Arrow {
         // Set line style based on isDotted property
         ctx.setLineDash(this.isDotted ? [5, 5] : []);
         
-        // Draw the main line
-        if (this.isSelfConnecting) {
-            this.drawSelfConnectingCurve(ctx, startCenterX, startCenterY);
+        // Set color based on AND group if applicable
+        if (this.isAndConnection && this.andGroupId) {
+            ctx.strokeStyle = getAndGroupColor(this.andGroupId);
+            ctx.fillStyle = getAndGroupColor(this.andGroupId);
         } else {
-            this.drawStraightLine(ctx, startCenterX, startCenterY);
+            ctx.strokeStyle = this.color;
+            ctx.fillStyle = this.color;
+        }
+        
+        // Draw the main line
+        let endPoint;
+        if (this.isSelfConnecting) {
+            endPoint = this.drawSelfConnectingCurve(ctx, startCenterX, startCenterY);
+        } else {
+            endPoint = this.drawStraightLine(ctx, startCenterX, startCenterY);
+        }
+        
+        // Draw AND indicator if this is an AND connection
+        if (this.isAndConnection) {
+            this.drawAndIndicator(ctx, endPoint.x, endPoint.y);
         }
         
         // Reset line style
@@ -592,6 +771,12 @@ if (!canvas) {
             return endArrow.startVariable === startVar;
         }
 
+        // Add a helper function to check if an arrow connects to another arrow's head
+        function connectsToArrowHead(startVar, endArrow) {
+            // Only allow connections to the head of another arrow
+            return endArrow instanceof Arrow;
+        }
+
         // Add a helper function to find arrow under point
         function findArrowUnderPoint(x, y) {
             for (let arrow of arrows) {
@@ -699,44 +884,17 @@ if (!canvas) {
                                           arrow.endVariable === hoveredForDeletion ||
                                           (arrow.endVariable instanceof Arrow && 
                                            arrow.endVariable.endVariable === hoveredForDeletion);
-                        if (isConnected) {
-                            // Remove terms from equations
-                            const targetVar = arrow.endVariable instanceof Arrow ? 
-                                arrow.endVariable.endVariable : arrow.endVariable;
-                            if (equations.has(targetVar.text)) {
-                                const terms = equations.get(targetVar.text);
-                                equations.set(targetVar.text, terms.filter(term => 
-                                    term.sourceVar !== hoveredForDeletion
-                                ));
-                            }
-                        }
                         return !isConnected;
                     });
                     // Delete the variable
                     activeVariables = activeVariables.filter(v => v !== hoveredForDeletion);
-                    // Delete its equation
-                    equations.delete(hoveredForDeletion.text);
-                    updateEquationsList();
                 } else if (hoveredForDeletion instanceof Arrow) {
                     // Delete the arrow
                     arrows = arrows.filter(arrow => arrow !== hoveredForDeletion);
-
-                    arrows = arrows.filter(arrow => {
-                        return arrow.endVariable !== hoveredForDeletion;
-                    });
-
-                    // Update equations
-                    const targetVar = hoveredForDeletion.endVariable instanceof Arrow ? 
-                        hoveredForDeletion.endVariable.endVariable : hoveredForDeletion.endVariable;
-                    if (equations.has(targetVar.text)) {
-                        const terms = equations.get(targetVar.text);
-                        equations.set(targetVar.text, terms.filter(term => 
-                            term.sourceVar !== hoveredForDeletion.startVariable
-                        ));
-                    }
-                    updateEquationsList();
+                    arrows = arrows.filter(arrow => arrow.endVariable !== hoveredForDeletion);
                 }
                 hoveredForDeletion = null;
+                updateEquationsList();
                 redraw();
                 return;
             }
@@ -746,21 +904,44 @@ if (!canvas) {
                 const endArrow = !endVariable ? findArrowUnderPoint(x, y) : null;
                 const target = endVariable || endArrow;
 
-                console.log('Mouseup:', { endVariable, endArrow, target });
-
-                if (target && !connectionExists(startVariable, target, arrowType) && 
-                    (!endArrow || !sharesStartNode(startVariable, endArrow))) {
-                    arrows.push(new Arrow(startVariable, target, arrowType));
-                    // Update the equation for the target variable
+                if (target) {
+                    // Handle arrow-to-arrow connections
                     if (endArrow) {
-                        console.log('Updating equation for arrow connection');
-                        // For arrow-to-arrow connections, update the equation of the target arrow's end variable
-                        updateEquationWithArrow(startVariable, endArrow, arrowType);
-                    } else {
-                        console.log('Updating equation for variable connection');
-                        // For variable-to-variable connections
-                        updateEquationWithArrow(startVariable, target, arrowType);
+                        if (!sharesStartNode(startVariable, endArrow)) {
+                            // Get the final target variable (end of the arrow chain)
+                            const finalTarget = endArrow.endVariable instanceof Arrow ? 
+                                endArrow.endVariable.endVariable : endArrow.endVariable;
+
+                            // Find the AND group of the connected arrow
+                            let existingAndGroupId = endArrow.andGroupId;
+
+                            // Create the new arrow
+                            const newArrow = new Arrow(startVariable, finalTarget, arrowType);
+                            newArrow.isAndConnection = true;
+                            
+                            // Use existing AND group ID or create new one
+                            if (existingAndGroupId) {
+                                // Use the AND group ID from the first existing arrow
+                                newArrow.andGroupId = existingAndGroupId;
+                            } else {
+                                        // Create new AND group
+                                        const newGroupId = Date.now();
+                                        newArrow.andGroupId = newGroupId;
+                                        // Also set the existing arrow's AND group
+                                        endArrow.isAndConnection = true;
+                                        endArrow.andGroupId = newGroupId;
+                                    }
+                            
+                            arrows.push(newArrow);
+                        }
+                    } else if (!connectionExists(startVariable, target, arrowType)) {
+                        // Regular variable-to-variable connection
+                        arrows.push(new Arrow(startVariable, target, arrowType));
                     }
+                    
+                    // Update equations
+                    updateEquationsList();
+                    
                     // Automatically deselect arrow mode after drawing
                     setArrowMode(null);
                 }
@@ -776,23 +957,54 @@ if (!canvas) {
             }
         });
 
+        function hasConstantTerm(variable, type) {
+            if (equations.has(variable.text)) {
+                const terms = equations.get(variable.text);
+                return terms.some(term => term.isConstant && term.type === type);
+            }
+            return false;
+        }
+
+        // Add a function to create a logic group
+        function createLogicGroup(terms, logicType) {
+            const groupId = Date.now(); // Use timestamp as unique group ID
+            terms.forEach(term => {
+                term.logicGroup = groupId;
+                term.logicType = logicType;
+            });
+            updateEquationsList();
+        }
+
+        // Add a function to remove a term from its logic group
+        function removeFromLogicGroup(term) {
+            term.logicGroup = null;
+            term.logicType = null;
+            updateEquationsList();
+        }
+
         // Drawing function
         function redraw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Draw arrows
             arrows.forEach(arrow => {
+                // Store original color
+                const originalColor = arrow.color;
+                
                 if (isDeleteMode && arrow === hoveredForDeletion) {
-                    ctx.strokeStyle = '#ff0000';
+                    arrow.color = '#ff0000'; // Red for delete mode hover
                     ctx.lineWidth = 4;
                 } else if (arrow === hoveredForRightClick) {
-                    ctx.strokeStyle = '#2196F3'; // Blue highlight for hover
+                    arrow.color = '#2196F3'; // Blue for right-click hover
                     ctx.lineWidth = 3;
                 } else {
-                    ctx.strokeStyle = '#000000';
                     ctx.lineWidth = 2;
                 }
+                
                 arrow.draw(ctx);
+                
+                // Restore original color
+                arrow.color = originalColor;
             });
             
             // Draw active variables
@@ -871,198 +1083,65 @@ if (!canvas) {
             button.textContent = panel.classList.contains('hidden') ? 'Show Equations' : 'Hide Equations';
         });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Get the context menu elements
-            const contextMenu = document.getElementById('contextMenu');
-            const arrowContextMenu = document.getElementById('arrowContextMenu');
-            const addConstantSourceButton = document.getElementById('addConstantSource');
-            const addConstantDegradationButton = document.getElementById('addConstantDegradation');
-            const toggleDottedButton = document.getElementById('toggleDotted');
-
-            // Hide the context menus initially
-            contextMenu.style.display = 'none';
-            arrowContextMenu.style.display = 'none';
-
-            // Add right-click event listener to the canvas
-            canvas.addEventListener('contextmenu', (e) => {
-                e.preventDefault(); // Prevent the default context menu from appearing
-
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX; // Global X position
-                const y = e.clientY; // Global Y position
-                const canvasX = x - rect.left;
-                const canvasY = y - rect.top;
-
-                // Check if the right-click is on a node or arrow
-                const clickedVariable = activeVariables.find(variable => variable.isPointInside(canvasX, canvasY));
-                const clickedArrow = !clickedVariable ? findArrowUnderPoint(canvasX, canvasY) : null;
-
-                if (clickedVariable) {
-                    // Show variable context menu
-                    contextMenu.style.left = `${x-100}px`;
-                    contextMenu.style.top = `${y-60}px`;
-                    contextMenu.style.display = 'block';
-                    arrowContextMenu.style.display = 'none';
-                    selectedVariable = clickedVariable;
-
-                    // Reset button states based on the selected variable
-                    if (hasConstantTerm(selectedVariable, 'promote')) {
-                        addConstantSourceButton.textContent = 'Remove Constant Source';
-                        addConstantSourceButton.style.backgroundColor = '#ff9800';
-                    } else {
-                        addConstantSourceButton.textContent = 'Add Constant Source';
-                        addConstantSourceButton.style.backgroundColor = '';
-                    }
-
-                    if (hasConstantTerm(selectedVariable, 'inhibit')) {
-                        addConstantDegradationButton.textContent = 'Remove Constant Degradation';
-                        addConstantDegradationButton.style.backgroundColor = '#ff9800';
-                    } else {
-                        addConstantDegradationButton.textContent = 'Add Constant Degradation';
-                        addConstantDegradationButton.style.backgroundColor = '';
-                    }
-                } else if (clickedArrow) {
-                    // Show arrow context menu
-                    arrowContextMenu.style.left = `${x-100}px`;
-                    arrowContextMenu.style.top = `${y-60}px`;
-                    arrowContextMenu.style.display = 'block';
-                    contextMenu.style.display = 'none';
-                    
-                    // Update button text based on current state
-                    toggleDottedButton.textContent = clickedArrow.isDotted ? 'Make Solid' : 'Make Dotted';
-                    toggleDottedButton.style.backgroundColor = clickedArrow.isDotted ? '#ff9800' : '';
-                    
-                    // Store the clicked arrow for later use
-                    selectedArrow = clickedArrow;
-                } else {
-                    // Hide both context menus if not clicking on a node or arrow
-                    contextMenu.style.display = 'none';
-                    arrowContextMenu.style.display = 'none';
-                }
-            });
-
-            // Hide the context menu when clicking elsewhere
-            window.addEventListener('click', () => {
-                contextMenu.style.display = 'none';
-                // Reset button states when context menu is hidden
-                addConstantSourceButton.textContent = 'Add Constant Source';
-                addConstantSourceButton.style.backgroundColor = '';
-                addConstantDegradationButton.textContent = 'Add Constant Degradation';
-                addConstantDegradationButton.style.backgroundColor = '';
-            });
-
-            // Add event listener for adding/removing constant source
-            addConstantSourceButton.addEventListener('click', () => {
-                if (selectedVariable) {
-                    console.log(`Adding constant source to ${selectedVariable.text}`);
-                    
-                    // Check if the constant source already exists
-                    if (hasConstantTerm(selectedVariable, 'promote')) {
-                        console.log('Constant source already exists for this variable.');
-                        // Change button text and color to indicate removal
-                        addConstantSourceButton.textContent = 'Remove Constant Source';
-                        addConstantSourceButton.style.backgroundColor = '#ff9800'; // Change to a different color
-                        
-                        // Remove the existing constant source term
-                        const terms = equations.get(selectedVariable.text);
-                        const termIndex = terms.findIndex(term => term.isConstant && term.type === 'promote');
-                        if (termIndex !== -1) {
-                            terms.splice(termIndex, 1); // Remove the term
-                            equations.set(selectedVariable.text, terms); // Update the equations map
-                            updateEquationsList(); // Update the displayed equations
-                        }
-                    } else {
-                        // If it doesn't exist, add the constant source
-                        if (!equations.has(selectedVariable.text)) {
-                            equations.set(selectedVariable.text, []);
-                        }
-                        
-                        const terms = equations.get(selectedVariable.text);
-                        
-                        // Add the +c term
-                        const constantSourceTerm = new Term(null, selectedVariable, 'promote', null, false, null, true); // Mark as constant
-                        terms.push(constantSourceTerm);
-                        
-                        // Update the equations map
-                        equations.set(selectedVariable.text, terms);
-                        
-                        // Update the equations list to reflect the changes
-                        updateEquationsList();
-                        
-                        // Change button text and color to indicate it has been added
-                        addConstantSourceButton.textContent = 'Remove Constant Source';
-                        addConstantSourceButton.style.backgroundColor = '#ff9800'; // Change to a different color
-                    }
-                }
-                contextMenu.style.display = 'none'; // Hide the context menu after action
-            });
-
-            // Add event listener for adding constant degradation
-            addConstantDegradationButton.addEventListener('click', () => {
-                const addConstantDegradationButton = document.getElementById('addConstantDegradation');
-
-                if (selectedVariable) {
-                    console.log(`Adding constant degradation to ${selectedVariable.text}`);
-                    
-                    // Check if the constant degradation already exists
-                    if (hasConstantTerm(selectedVariable, 'inhibit')) {
-                        console.log('Constant degradation already exists for this variable.');
-                        // Change button text and color to indicate removal
-                        addConstantDegradationButton.textContent = 'Remove Constant Degradation';
-                        addConstantDegradationButton.style.backgroundColor = '#ff9800'; // Change to a different color
-                        
-                        // Remove the existing constant degradation term
-                        const terms = equations.get(selectedVariable.text);
-                        const termIndex = terms.findIndex(term => term.isConstant && term.type === 'inhibit');
-                        if (termIndex !== -1) {
-                            terms.splice(termIndex, 1); // Remove the term
-                            equations.set(selectedVariable.text, terms); // Update the equations map
-                            updateEquationsList(); // Update the displayed equations
-                        }
-                    } else {
-                        // If it doesn't exist, add the constant degradation
-                        if (!equations.has(selectedVariable.text)) {
-                            equations.set(selectedVariable.text, []);
-                        }
-                        
-                        const terms = equations.get(selectedVariable.text);
-                        
-                        // Add the -c term for degradation
-                        const constantDegradationTerm = new Term(null, selectedVariable, 'inhibit', null, false, null, true); // Mark as constant
-                        terms.push(constantDegradationTerm);
-                        
-                        // Update the equations map
-                        equations.set(selectedVariable.text, terms);
-                        
-                        // Update the equations list to reflect the changes
-                        updateEquationsList();
-                        
-                        // Change button text and color to indicate it has been added
-                        addConstantDegradationButton.textContent = 'Remove Constant Degradation';
-                        addConstantDegradationButton.style.backgroundColor = '#ff9800'; // Change to a different color
-                    }
-                }
-                contextMenu.style.display = 'none'; // Hide the context menu after action
-            });
-
-            // Add event listener for toggling dotted line
-            toggleDottedButton.addEventListener('click', () => {
-                if (selectedArrow) {
-                    selectedArrow.isDotted = !selectedArrow.isDotted;
-                    toggleDottedButton.textContent = selectedArrow.isDotted ? 'Make Solid' : 'Make Dotted';
-                    toggleDottedButton.style.backgroundColor = selectedArrow.isDotted ? '#ff9800' : '';
-                    redraw();
-                }
-                arrowContextMenu.style.display = 'none';
-            });
-        });
-
-        function hasConstantTerm(variable, type) {
-            if (equations.has(variable.text)) {
-                const terms = equations.get(variable.text);
-                return terms.some(term => term.isConstant && term.type === type);
+        // Helper function to update equation with new term
+        function updateEquationWithArrow(startVar, endVar, type) {
+            console.log('Updating equation:', { startVar, endVar, type });
+            
+            // Get the target variable for the equation
+            const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
+            
+            // Initialize terms array if it doesn't exist
+            if (!equations.has(targetVar.text)) {
+                equations.set(targetVar.text, []);
             }
-            return false;
+            
+            let terms = equations.get(targetVar.text);
+            
+            // Create new term
+            const newTerm = new Term(startVar, targetVar, type);
+            
+            // Find existing terms for the target variable that are part of an AND group
+            const existingAndTerms = terms.filter(term => term.logicType === 'and');
+            
+            let groupId;
+            if (existingAndTerms.length > 0) {
+                // Add to existing AND group
+                groupId = existingAndTerms[0].logicGroup;
+                newTerm.logicGroup = groupId;
+                newTerm.logicType = 'and';
+                
+                // Ensure all related terms are in the same group
+                existingAndTerms.forEach(term => {
+                    term.logicGroup = groupId;
+                    term.logicType = 'and';
+                });
+                    } else {
+                // Create a new AND group
+                groupId = Date.now();
+                newTerm.logicGroup = groupId;
+                newTerm.logicType = 'and';
+            }
+            
+            terms.push(newTerm);
+            equations.set(targetVar.text, terms);
+                        updateEquationsList();
+                        
+            // Set the AND group ID for the arrow
+            const newArrow = arrows[arrows.length - 1];
+            if (newArrow) {
+                newArrow.isAndConnection = true;
+                newArrow.andGroupId = groupId;
+            }
+        }
+
+        // Add this helper function
+        function getAndGroupColor(groupId) {
+            if (!andGroupColors.has(groupId)) {
+                // Generate a random pastel color
+                const hue = Math.random() * 360;
+                andGroupColors.set(groupId, `hsl(${hue}, 70%, 80%)`);
+            }
+            return andGroupColors.get(groupId);
         }
     }
 } 
