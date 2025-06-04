@@ -80,25 +80,25 @@ class Term {
                         return t.type === 'promote' ? 
                             `c_{${t.coefficientId}}` : 
                             `-c_{${t.coefficientId}}`;
-                    } else {
+        } else {
                         // Check if source is an arrow (arrow-to-arrow connection)
                         const isArrowToArrow = t.sourceVar instanceof Arrow;
                         if (isArrowToArrow) {
-                            return t.type === 'promote' ? 
+            return t.type === 'promote' ? 
                                 `\\frac{${t.sourceVar.startVariable.text}^h}{k_${t.kmId} + ${t.sourceVar.startVariable.text}^h}` : 
                                 `\\frac{1}{1 + ${t.sourceVar.startVariable.text}^h}`;
                         } else {
                             return t.type === 'promote' ? 
                                 `\\frac{${t.sourceVar.text}^h}{k_${t.kmId} + ${t.sourceVar.text}^h}` : 
-                                `\\frac{1}{1 + ${t.sourceVar.text}^h}`;
+            `\\frac{1}{1 + ${t.sourceVar.text}^h}`;
                         }
-                    }
-                });
-                
+        }
+    });
+    
                 const coefficient = getNextCoefficient();
                 const termString = this.logicType === 'and' ? 
-                    termStringsWithoutCoefficient.join(' \\cdot ') : 
-                    termStringsWithoutCoefficient.join(' + ');
+                termStringsWithoutCoefficient.join(' \\cdot ') : 
+                termStringsWithoutCoefficient.join(' + ');
 
                 let termStringWithConstant = `c_{${coefficient}}` + termString;
                 
@@ -116,7 +116,7 @@ class Term {
             // Check if source is an arrow (arrow-to-arrow connection)
             const isArrowToArrow = this.sourceVar instanceof Arrow;
             if (isArrowToArrow) {
-                termString = this.type === 'promote' ? 
+            termString = this.type === 'promote' ? 
                     `c_{${this.coefficientId}} \\frac{${this.sourceVar.startVariable.text}^h}{k_${this.kmId} + ${this.sourceVar.startVariable.text}^h}` : 
                     `c_{${this.coefficientId}} \\frac{1}{1 + ${this.sourceVar.startVariable.text}^h}`;
             } else {
@@ -253,10 +253,10 @@ function updateEquationsList() {
     equationsList.innerHTML = Array.from(equations.entries()).map(([variable, terms], index) => {
         console.log(`Generating equation for ${variable}:`, terms);
         return `
-            <div class="equation-item">
-                <div class="equation-content">$$\\frac{d${variable}}{dt}=${terms.map((term, i) => term.toString(i === 0)).join(' ')}$$</div>
-                <button onclick="deleteEquation('${variable}')" class="delete-equation">×</button>
-            </div>
+        <div class="equation-item">
+            <div class="equation-content">$$\\frac{d${variable}}{dt}=${terms.map((term, i) => term.toString(i === 0)).join(' ')}$$</div>
+            <button onclick="deleteEquation('${variable}')" class="delete-equation">×</button>
+        </div>
         `;
     }).join('');
 
@@ -729,10 +729,10 @@ class Arrow {
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize canvas
-    const canvas = document.getElementById('mainCanvas');
-    if (!canvas) {
-        console.error('Canvas element not found!');
+// Initialize canvas
+const canvas = document.getElementById('mainCanvas');
+if (!canvas) {
+    console.error('Canvas element not found!');
         return;
     }
     
@@ -742,35 +742,35 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // Set canvas size
-    function resizeCanvas() {
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-        redraw();
-    }
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            redraw();
+        }
 
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-    // Add initial nodes for debugging
-    function addInitialNodes() {
-        // Add node A
-        const nodeA = new ActiveVariable(100, 100, 'A');
-        activeVariables.push(nodeA);
-        
-        // Add node B
-        const nodeB = new ActiveVariable(300, 100, 'B');
-        activeVariables.push(nodeB);
-        
-        // Add node C
-        const nodeC = new ActiveVariable(200, 300, 'C');
-        activeVariables.push(nodeC);
-        
-        redraw();
-    }
+        // Add initial nodes for debugging
+        function addInitialNodes() {
+            // Add node A
+            const nodeA = new ActiveVariable(100, 100, 'A');
+            activeVariables.push(nodeA);
+            
+            // Add node B
+            const nodeB = new ActiveVariable(300, 100, 'B');
+            activeVariables.push(nodeB);
+            
+            // Add node C
+            const nodeC = new ActiveVariable(200, 300, 'C');
+            activeVariables.push(nodeC);
+            
+            redraw();
+        }
 
-    // Call the function to add initial nodes
-    addInitialNodes();
+        // Call the function to add initial nodes
+        addInitialNodes();
 
     // Add right-click menu functionality
     canvas.addEventListener('contextmenu', (e) => {
@@ -904,322 +904,322 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Event listeners
-    document.getElementById('addTextBox').addEventListener('click', () => {
-        setDeleteMode(false);
-        const text = prompt('Enter name for the active variable:', 'New Variable');
-        if (text !== null) {
-            let x = 50;
-            let y = 50;
-            let attempts = 0;
-            const maxAttempts = 10;
-            
-            // Try to find a non-overlapping position
-            while (attempts < maxAttempts) {
-                const newVariable = new ActiveVariable(x, y, text);
-                const hasOverlap = activeVariables.some(existingVariable => newVariable.overlaps(existingVariable));
+        // Event listeners
+        document.getElementById('addTextBox').addEventListener('click', () => {
+            setDeleteMode(false);
+            const text = prompt('Enter name for the active variable:', 'New Variable');
+            if (text !== null) {
+                let x = 50;
+                let y = 50;
+                let attempts = 0;
+                const maxAttempts = 10;
                 
-                if (!hasOverlap) {
-                    activeVariables.push(newVariable);
-                    break;
+                // Try to find a non-overlapping position
+                while (attempts < maxAttempts) {
+                    const newVariable = new ActiveVariable(x, y, text);
+                    const hasOverlap = activeVariables.some(existingVariable => newVariable.overlaps(existingVariable));
+                    
+                    if (!hasOverlap) {
+                        activeVariables.push(newVariable);
+                        break;
+                    }
+                    
+                    // Move to the right and try again
+                    x += 100;
+                    attempts++;
+                    
+                    // If we've gone too far right, move down and reset x
+                    if (x > canvas.width - 100) {
+                        x = 50;
+                        y += 100;
+                    }
                 }
                 
-                // Move to the right and try again
-                x += 100;
-                attempts++;
-                
-                // If we've gone too far right, move down and reset x
-                if (x > canvas.width - 100) {
-                    x = 50;
-                    y += 100;
+                // If we couldn't find a non-overlapping position, just add it at the last attempted position
+                if (attempts === maxAttempts) {
+                    activeVariables.push(new ActiveVariable(x, y, text));
                 }
+                
+                redraw();
             }
-            
-            // If we couldn't find a non-overlapping position, just add it at the last attempted position
-            if (attempts === maxAttempts) {
-                activeVariables.push(new ActiveVariable(x, y, text));
-            }
-            
-            redraw();
-        }
-    });
-
-    function setArrowMode(type) {
-        isDrawingArrow = !!type;
-        arrowType = type;
-        // UI feedback
-        document.getElementById('drawPromoteArrow').style.backgroundColor = (type === 'promote') ? '#ff9800' : '#4CAF50';
-        document.getElementById('drawInhibitArrow').style.backgroundColor = (type === 'inhibit') ? '#ff9800' : '#4CAF50';
-        
-        // Update cursor
-        if (isDrawingArrow) {
-            canvas.style.cursor = 'crosshair';
-        } else {
-            canvas.style.cursor = 'default';
-        }
-    }
-
-    document.getElementById('drawPromoteArrow').addEventListener('click', () => {
-        setDeleteMode(false);
-        setArrowMode(isDrawingArrow && arrowType === 'promote' ? null : 'promote');
-    });
-    document.getElementById('drawInhibitArrow').addEventListener('click', () => {
-        setDeleteMode(false);
-        setArrowMode(isDrawingArrow && arrowType === 'inhibit' ? null : 'inhibit');
-    });
-
-    function setDeleteMode(enabled) {
-        isDeleteMode = enabled;
-        isDrawingArrow = false;
-        arrowType = null;
-        // UI feedback
-        const deleteButton = document.getElementById('deleteButton');
-        if (enabled) {
-            deleteButton.classList.add('active');
-        } else {
-            deleteButton.classList.remove('active');
-        }
-        
-        // Update cursor
-        canvas.style.cursor = enabled ? 'crosshair' : 'default';
-    }
-
-    // Add delete button event listener
-    document.getElementById('deleteButton').addEventListener('click', () => {
-        setDeleteMode(!isDeleteMode);
-    });
-
-    document.getElementById('clearAll').addEventListener('click', () => {
-        setDeleteMode(false);
-        activeVariables = [];
-        arrows = [];
-        equations.clear();
-        globalCoefficientCounter = 0;
-        globalKMCounter = 0;
-        updateEquationsList();
-        redraw();
-    });
-
-    // Mouse event handlers
-    canvas.addEventListener('mousedown', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        if (isDrawingArrow) {
-            startVariable = activeVariables.find(variable => variable.isPointInside(x, y));
-            if (startVariable) {
-                canvas.style.cursor = 'crosshair';
-            }
-        } else {
-            selectedVariable = activeVariables.find(variable => variable.isPointInside(x, y));
-            if (selectedVariable) {
-                selectedVariable.isDragging = true;
-                selectedVariable.dragOffsetX = x - selectedVariable.x;
-                selectedVariable.dragOffsetY = y - selectedVariable.y;
-                canvas.style.cursor = 'move';
-            }
-        }
-    });
-
-    // Add a helper function to check if a connection already exists
-    function connectionExists(startVar, endVar, type) {
-        return arrows.some(arrow => 
-            arrow.startVariable === startVar && 
-            arrow.endVariable === endVar && 
-            arrow.type === type // Check if the type is the same
-        );
-    }
-
-    // Add a helper function to check if arrows share the same start node
-    function sharesStartNode(startVar, endArrow) {
-        return endArrow.startVariable === startVar;
-    }
-
-    // Add a helper function to check if an arrow connects to another arrow's head
-    function connectsToArrowHead(startVar, endArrow) {
-        // Only allow connections to the head of another arrow
-        return endArrow instanceof Arrow;
-    }
-
-    // Add a helper function to find arrow under point
-    function findArrowUnderPoint(x, y) {
-        for (let arrow of arrows) {
-            const midpoint = arrow.getMidpoint();
-            const distance = Math.sqrt(
-                Math.pow(x - midpoint.x, 2) + 
-                Math.pow(y - midpoint.y, 2)
-            );
-            if (distance < 20) { // Increased radius for easier clicking
-                return arrow;
-            }
-        }
-        return null;
-    }
-
-    // Update mousemove to track position and handle hover effects
-    canvas.addEventListener('mousemove', (e) => {
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Reset hover state for all variables
-        activeVariables.forEach(variable => {
-            variable.isHovered = false;
         });
 
-        // Find hovered variable or arrow
-        const hoveredVariable = activeVariables.find(variable => variable.isPointInside(x, y));
-        const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(x, y) : null;
-        
-        // Update hoveredForRightClick
-        hoveredForRightClick = hoveredVariable || hoveredArrow;
-        
-        if (isDeleteMode) {
-            hoveredForDeletion = hoveredForRightClick;
-            if (hoveredForDeletion) {
+        function setArrowMode(type) {
+            isDrawingArrow = !!type;
+            arrowType = type;
+            // UI feedback
+            document.getElementById('drawPromoteArrow').style.backgroundColor = (type === 'promote') ? '#ff9800' : '#4CAF50';
+            document.getElementById('drawInhibitArrow').style.backgroundColor = (type === 'inhibit') ? '#ff9800' : '#4CAF50';
+            
+            // Update cursor
+            if (isDrawingArrow) {
                 canvas.style.cursor = 'crosshair';
             } else {
                 canvas.style.cursor = 'default';
             }
-        } else {
-            hoveredForDeletion = null;
-            if (hoveredVariable) {
-                hoveredVariable.isHovered = true;
-                
-                if (isDrawingArrow && startVariable) {
-                    if (connectionExists(startVariable, hoveredVariable, arrowType)) {
+        }
+
+        document.getElementById('drawPromoteArrow').addEventListener('click', () => {
+            setDeleteMode(false);
+            setArrowMode(isDrawingArrow && arrowType === 'promote' ? null : 'promote');
+        });
+        document.getElementById('drawInhibitArrow').addEventListener('click', () => {
+            setDeleteMode(false);
+            setArrowMode(isDrawingArrow && arrowType === 'inhibit' ? null : 'inhibit');
+        });
+
+        function setDeleteMode(enabled) {
+            isDeleteMode = enabled;
+            isDrawingArrow = false;
+            arrowType = null;
+            // UI feedback
+            const deleteButton = document.getElementById('deleteButton');
+            if (enabled) {
+                deleteButton.classList.add('active');
+            } else {
+                deleteButton.classList.remove('active');
+            }
+            
+            // Update cursor
+            canvas.style.cursor = enabled ? 'crosshair' : 'default';
+        }
+
+        // Add delete button event listener
+        document.getElementById('deleteButton').addEventListener('click', () => {
+            setDeleteMode(!isDeleteMode);
+        });
+
+        document.getElementById('clearAll').addEventListener('click', () => {
+            setDeleteMode(false);
+            activeVariables = [];
+            arrows = [];
+            equations.clear();
+            globalCoefficientCounter = 0;
+            globalKMCounter = 0;
+            updateEquationsList();
+            redraw();
+        });
+
+        // Mouse event handlers
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (isDrawingArrow) {
+                startVariable = activeVariables.find(variable => variable.isPointInside(x, y));
+                if (startVariable) {
+                    canvas.style.cursor = 'crosshair';
+                }
+            } else {
+                selectedVariable = activeVariables.find(variable => variable.isPointInside(x, y));
+                if (selectedVariable) {
+                    selectedVariable.isDragging = true;
+                    selectedVariable.dragOffsetX = x - selectedVariable.x;
+                    selectedVariable.dragOffsetY = y - selectedVariable.y;
+                    canvas.style.cursor = 'move';
+                }
+            }
+        });
+
+        // Add a helper function to check if a connection already exists
+        function connectionExists(startVar, endVar, type) {
+            return arrows.some(arrow => 
+                arrow.startVariable === startVar && 
+                arrow.endVariable === endVar && 
+                arrow.type === type // Check if the type is the same
+            );
+        }
+
+        // Add a helper function to check if arrows share the same start node
+        function sharesStartNode(startVar, endArrow) {
+            return endArrow.startVariable === startVar;
+        }
+
+        // Add a helper function to check if an arrow connects to another arrow's head
+        function connectsToArrowHead(startVar, endArrow) {
+            // Only allow connections to the head of another arrow
+            return endArrow instanceof Arrow;
+        }
+
+        // Add a helper function to find arrow under point
+        function findArrowUnderPoint(x, y) {
+            for (let arrow of arrows) {
+                const midpoint = arrow.getMidpoint();
+                const distance = Math.sqrt(
+                    Math.pow(x - midpoint.x, 2) + 
+                    Math.pow(y - midpoint.y, 2)
+                );
+                if (distance < 20) { // Increased radius for easier clicking
+                    return arrow;
+                }
+            }
+            return null;
+        }
+
+        // Update mousemove to track position and handle hover effects
+        canvas.addEventListener('mousemove', (e) => {
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Reset hover state for all variables
+            activeVariables.forEach(variable => {
+                variable.isHovered = false;
+            });
+
+            // Find hovered variable or arrow
+            const hoveredVariable = activeVariables.find(variable => variable.isPointInside(x, y));
+            const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(x, y) : null;
+            
+            // Update hoveredForRightClick
+            hoveredForRightClick = hoveredVariable || hoveredArrow;
+            
+            if (isDeleteMode) {
+                hoveredForDeletion = hoveredForRightClick;
+                if (hoveredForDeletion) {
+                    canvas.style.cursor = 'crosshair';
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            } else {
+                hoveredForDeletion = null;
+                if (hoveredVariable) {
+                    hoveredVariable.isHovered = true;
+                    
+                    if (isDrawingArrow && startVariable) {
+                        if (connectionExists(startVariable, hoveredVariable, arrowType)) {
+                            canvas.style.cursor = 'not-allowed';
+                        } else {
+                            canvas.style.cursor = 'crosshair';
+                        }
+                    } else if (!isDrawingArrow) {
+                        canvas.style.cursor = 'move';
+                    }
+                } else if (hoveredArrow && isDrawingArrow && startVariable) {
+                    if (connectionExists(startVariable, hoveredArrow, arrowType)) {
                         canvas.style.cursor = 'not-allowed';
                     } else {
                         canvas.style.cursor = 'crosshair';
                     }
-                } else if (!isDrawingArrow) {
-                    canvas.style.cursor = 'move';
-                }
-            } else if (hoveredArrow && isDrawingArrow && startVariable) {
-                if (connectionExists(startVariable, hoveredArrow, arrowType)) {
-                    canvas.style.cursor = 'not-allowed';
                 } else {
-                    canvas.style.cursor = 'crosshair';
-                }
-            } else {
-                if (isDrawingArrow) {
-                    canvas.style.cursor = 'crosshair';
-                } else if (hoveredForRightClick) {
-                    canvas.style.cursor = 'context-menu';
-                } else {
-                    canvas.style.cursor = 'default';
-                }
-            }
-        }
-
-        // Handle dragging
-        if (selectedVariable && selectedVariable.isDragging) {
-            selectedVariable.x = x - selectedVariable.dragOffsetX;
-            selectedVariable.y = y - selectedVariable.dragOffsetY;
-            redraw();
-        } else {
-            redraw();
-        }
-    });
-
-    // Update mouseout event for canvas
-    canvas.addEventListener('mouseout', () => {
-        // Reset hover states
-        activeVariables.forEach(variable => {
-            variable.isHovered = false;
-        });
-        canvas.style.cursor = 'default';
-        redraw();
-    });
-
-    // Update the mouseup event handler
-    canvas.addEventListener('mouseup', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        if (isDeleteMode && hoveredForDeletion) {
-            if (hoveredForDeletion instanceof ActiveVariable) {
-                // Delete all arrows connected to this variable
-                arrows = arrows.filter(arrow => {
-                    const isConnected = arrow.startVariable === hoveredForDeletion || 
-                                      arrow.endVariable === hoveredForDeletion ||
-                                      (arrow.endVariable instanceof Arrow && 
-                                       arrow.endVariable.endVariable === hoveredForDeletion);
-                    return !isConnected;
-                });
-                // Delete the variable
-                activeVariables = activeVariables.filter(v => v !== hoveredForDeletion);
-            } else if (hoveredForDeletion instanceof Arrow) {
-                // Delete the arrow
-                arrows = arrows.filter(arrow => arrow !== hoveredForDeletion);
-                arrows = arrows.filter(arrow => arrow.endVariable !== hoveredForDeletion);
-            }
-            hoveredForDeletion = null;
-            updateEquationsList();
-            return;
-        }
-
-        if (isDrawingArrow && startVariable) {
-            const endVariable = activeVariables.find(variable => variable.isPointInside(x, y));
-            const endArrow = !endVariable ? findArrowUnderPoint(x, y) : null;
-            const target = endVariable || endArrow;
-
-            if (target) {
-                // Handle arrow-to-arrow connections
-                if (endArrow) {
-                    if (!sharesStartNode(startVariable, endArrow)) {
-                        // Get the final target variable (end of the arrow chain)
-                        const finalTarget = endArrow.endVariable instanceof Arrow ? 
-                            endArrow.endVariable.endVariable : endArrow.endVariable;
-
-                        // Find the AND group of the connected arrow
-                        let existingAndGroupId = endArrow.andGroupId;
-
-                        // Create the new arrow
-                        const newArrow = new Arrow(startVariable, finalTarget, arrowType);
-                        newArrow.isAndConnection = true;
-                        
-                        // Use existing AND group ID or create new one
-                        if (existingAndGroupId) {
-                            // Use the AND group ID from the first existing arrow
-                            newArrow.andGroupId = existingAndGroupId;
-                        } else {
-                            // Create new AND group
-                            const newGroupId = Date.now();
-                            newArrow.andGroupId = newGroupId;
-                            // Also set the existing arrow's AND group
-                            endArrow.isAndConnection = true;
-                            endArrow.andGroupId = newGroupId;
-                        }
-                        
-                        arrows.push(newArrow);
+                    if (isDrawingArrow) {
+                        canvas.style.cursor = 'crosshair';
+                    } else if (hoveredForRightClick) {
+                        canvas.style.cursor = 'context-menu';
+                    } else {
+                        canvas.style.cursor = 'default';
                     }
-                } else if (!connectionExists(startVariable, target, arrowType)) {
-                    // Regular variable-to-variable connection
-                    arrows.push(new Arrow(startVariable, target, arrowType));
                 }
-                
-                // Update equations
-                updateEquationsList();
-                
-                // Automatically deselect arrow mode after drawing
-                setArrowMode(null);
             }
-            startVariable = null;
+
+            // Handle dragging
+            if (selectedVariable && selectedVariable.isDragging) {
+                selectedVariable.x = x - selectedVariable.dragOffsetX;
+                selectedVariable.y = y - selectedVariable.dragOffsetY;
+                redraw();
+            } else {
+                redraw();
+            }
+        });
+
+        // Update mouseout event for canvas
+        canvas.addEventListener('mouseout', () => {
+            // Reset hover states
+            activeVariables.forEach(variable => {
+                variable.isHovered = false;
+            });
             canvas.style.cursor = 'default';
             redraw();
-        }
+        });
 
-        if (selectedVariable) {
-            selectedVariable.isDragging = false;
-            selectedVariable = null;
-            canvas.style.cursor = 'default';
-        }
-    });
+        // Update the mouseup event handler
+        canvas.addEventListener('mouseup', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (isDeleteMode && hoveredForDeletion) {
+                if (hoveredForDeletion instanceof ActiveVariable) {
+                    // Delete all arrows connected to this variable
+                    arrows = arrows.filter(arrow => {
+                        const isConnected = arrow.startVariable === hoveredForDeletion || 
+                                          arrow.endVariable === hoveredForDeletion ||
+                                          (arrow.endVariable instanceof Arrow && 
+                                           arrow.endVariable.endVariable === hoveredForDeletion);
+                        return !isConnected;
+                    });
+                    // Delete the variable
+                    activeVariables = activeVariables.filter(v => v !== hoveredForDeletion);
+                } else if (hoveredForDeletion instanceof Arrow) {
+                    // Delete the arrow
+                    arrows = arrows.filter(arrow => arrow !== hoveredForDeletion);
+                    arrows = arrows.filter(arrow => arrow.endVariable !== hoveredForDeletion);
+                }
+                hoveredForDeletion = null;
+                updateEquationsList();
+                return;
+            }
+
+            if (isDrawingArrow && startVariable) {
+                const endVariable = activeVariables.find(variable => variable.isPointInside(x, y));
+                const endArrow = !endVariable ? findArrowUnderPoint(x, y) : null;
+                const target = endVariable || endArrow;
+
+                if (target) {
+                    // Handle arrow-to-arrow connections
+                    if (endArrow) {
+                        if (!sharesStartNode(startVariable, endArrow)) {
+                            // Get the final target variable (end of the arrow chain)
+                            const finalTarget = endArrow.endVariable instanceof Arrow ? 
+                                endArrow.endVariable.endVariable : endArrow.endVariable;
+
+                            // Find the AND group of the connected arrow
+                            let existingAndGroupId = endArrow.andGroupId;
+
+                            // Create the new arrow
+                            const newArrow = new Arrow(startVariable, finalTarget, arrowType);
+                            newArrow.isAndConnection = true;
+                            
+                            // Use existing AND group ID or create new one
+                            if (existingAndGroupId) {
+                                // Use the AND group ID from the first existing arrow
+                                newArrow.andGroupId = existingAndGroupId;
+                            } else {
+                                        // Create new AND group
+                                        const newGroupId = Date.now();
+                                        newArrow.andGroupId = newGroupId;
+                                        // Also set the existing arrow's AND group
+                                        endArrow.isAndConnection = true;
+                                        endArrow.andGroupId = newGroupId;
+                                    }
+                            
+                            arrows.push(newArrow);
+                        }
+                    } else if (!connectionExists(startVariable, target, arrowType)) {
+                        // Regular variable-to-variable connection
+                        arrows.push(new Arrow(startVariable, target, arrowType));
+                    }
+                    
+                    // Update equations
+                    updateEquationsList();
+                    
+                    // Automatically deselect arrow mode after drawing
+                    setArrowMode(null);
+                }
+                startVariable = null;
+                canvas.style.cursor = 'default';
+                redraw();
+            }
+
+            if (selectedVariable) {
+                selectedVariable.isDragging = false;
+                selectedVariable = null;
+                canvas.style.cursor = 'default';
+            }
+        });
 
     // Add event listeners for toggle buttons
     document.getElementById('toggleDotted').addEventListener('click', (e) => {
@@ -1237,182 +1237,182 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('arrowContextMenu').style.display = 'none';
     });
 
-    function hasConstantTerm(variable, type) {
-        if (equations.has(variable.text)) {
-            const terms = equations.get(variable.text);
-            return terms.some(term => term.isConstant && term.type === type);
+        function hasConstantTerm(variable, type) {
+            if (equations.has(variable.text)) {
+                const terms = equations.get(variable.text);
+                return terms.some(term => term.isConstant && term.type === type);
+            }
+            return false;
         }
-        return false;
-    }
 
-    // Add a function to create a logic group
-    function createLogicGroup(terms, logicType) {
-        const groupId = Date.now(); // Use timestamp as unique group ID
-        terms.forEach(term => {
-            term.logicGroup = groupId;
-            term.logicType = logicType;
-        });
-        updateEquationsList();
-    }
-
-    // Add a function to remove a term from its logic group
-    function removeFromLogicGroup(term) {
-        term.logicGroup = null;
-        term.logicType = null;
-        updateEquationsList();
-    }
-
-    // Drawing function
-    function redraw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw arrows
-        arrows.forEach(arrow => {
-            // Store original color
-            const originalColor = arrow.color;
-            
-            if (isDeleteMode && arrow === hoveredForDeletion) {
-                arrow.color = '#ff0000'; // Red for delete mode hover
-                ctx.lineWidth = 4;
-            } else if (arrow === hoveredForRightClick) {
-                arrow.color = '#2196F3'; // Blue for right-click hover
-                ctx.lineWidth = 3;
-            } else {
-                ctx.lineWidth = 2;
-            }
-            
-            arrow.draw(ctx);
-            
-            // Restore original color
-            arrow.color = originalColor;
-        });
-        
-        // Draw active variables
-        activeVariables.forEach(variable => {
-            if (isDeleteMode && variable === hoveredForDeletion) {
-                ctx.strokeStyle = '#ff0000';
-                ctx.lineWidth = 4;
-                ctx.fillStyle = '#ffcccc'; // Light red fill for hovered variables
-            } else if (variable === hoveredForRightClick) {
-                ctx.strokeStyle = '#2196F3'; // Blue highlight for hover
-                ctx.lineWidth = 3;
-                ctx.fillStyle = '#e3f2fd'; // Light blue fill for hover
-            } else {
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 2;
-                ctx.fillStyle = variable.isHovered ? '#e0e0e0' : '#ffffff';
-            }
-            variable.draw(ctx);
-        });
-
-        // Draw grey overlay and connection points when drawing arrows
-        if (isDrawingArrow && startVariable) {
-            const hoveredVariable = activeVariables.find(variable => variable.isHovered);
-            const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(
-                lastMouseX - canvas.getBoundingClientRect().left,
-                lastMouseY - canvas.getBoundingClientRect().top
-            ) : null;
-
-            // Draw all available connection points
-            if (!hoveredVariable) {
-                // Draw variable connection points
-                activeVariables.forEach(variable => {
-                    if (!connectionExists(startVariable, variable, arrowType)) {
-                        const angle = Math.atan2(
-                            variable.y + variable.radius - (startVariable.y + startVariable.radius),
-                            variable.x + variable.radius - (startVariable.x + startVariable.radius)
-                        );
-                        const point = variable.getIntersectionPoint(angle + Math.PI);
-                        drawConnectionPoint(point.x, point.y);
-                    }
-                });
-
-                // Draw arrow midpoints
-                arrows.forEach(arrow => {
-                    if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
-                        const midpoint = arrow.getMidpoint();
-                        drawConnectionPoint(midpoint.x, midpoint.y);
-                    }
-                });
-            }
-
-            if (!hoveredVariable && !hoveredArrow) {
-                // Draw semi-transparent grey overlay
-                ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-        }
-    }
-
-    // Helper function to draw connection points
-    function drawConnectionPoint(x, y) {
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = '#4CAF50';
-        ctx.fill();
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-    }
-
-    // Add toggle equations functionality
-    document.getElementById('toggleEquations').addEventListener('click', () => {
-        const panel = document.getElementById('equationsPanel');
-        const button = document.getElementById('toggleEquations');
-        panel.classList.toggle('hidden');
-        button.textContent = panel.classList.contains('hidden') ? 'Show Equations' : 'Hide Equations';
-    });
-
-    // Helper function to update equation with new term
-    function updateEquationWithArrow(startVar, endVar, type) {
-        console.log('Updating equation:', { startVar, endVar, type });
-        
-        // Get the target variable for the equation
-        const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
-        
-        // Initialize terms array if it doesn't exist
-        if (!equations.has(targetVar.text)) {
-            equations.set(targetVar.text, []);
-        }
-        
-        let terms = equations.get(targetVar.text);
-        
-        // Create new term
-        const newTerm = new Term(startVar, targetVar, type);
-        
-        // Find existing terms for the target variable that are part of an AND group
-        const existingAndTerms = terms.filter(term => term.logicType === 'and');
-        
-        let groupId;
-        if (existingAndTerms.length > 0) {
-            // Add to existing AND group
-            groupId = existingAndTerms[0].logicGroup;
-            newTerm.logicGroup = groupId;
-            newTerm.logicType = 'and';
-            
-            // Ensure all related terms are in the same group
-            existingAndTerms.forEach(term => {
+        // Add a function to create a logic group
+        function createLogicGroup(terms, logicType) {
+            const groupId = Date.now(); // Use timestamp as unique group ID
+            terms.forEach(term => {
                 term.logicGroup = groupId;
-                term.logicType = 'and';
+                term.logicType = logicType;
             });
-        } else {
-            // Create a new AND group
-            groupId = Date.now();
-            newTerm.logicGroup = groupId;
-            newTerm.logicType = 'and';
+            updateEquationsList();
         }
-        
-        terms.push(newTerm);
-        equations.set(targetVar.text, terms);
-        updateEquationsList();
-        
-        // Set the AND group ID for the arrow
-        const newArrow = arrows[arrows.length - 1];
-        if (newArrow) {
-            newArrow.isAndConnection = true;
-            newArrow.andGroupId = groupId;
+
+        // Add a function to remove a term from its logic group
+        function removeFromLogicGroup(term) {
+            term.logicGroup = null;
+            term.logicType = null;
+            updateEquationsList();
         }
-    }
+
+        // Drawing function
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw arrows
+            arrows.forEach(arrow => {
+                // Store original color
+                const originalColor = arrow.color;
+                
+                if (isDeleteMode && arrow === hoveredForDeletion) {
+                    arrow.color = '#ff0000'; // Red for delete mode hover
+                    ctx.lineWidth = 4;
+                } else if (arrow === hoveredForRightClick) {
+                    arrow.color = '#2196F3'; // Blue for right-click hover
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.lineWidth = 2;
+                }
+                
+                arrow.draw(ctx);
+                
+                // Restore original color
+                arrow.color = originalColor;
+            });
+            
+            // Draw active variables
+            activeVariables.forEach(variable => {
+                if (isDeleteMode && variable === hoveredForDeletion) {
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 4;
+                    ctx.fillStyle = '#ffcccc'; // Light red fill for hovered variables
+                } else if (variable === hoveredForRightClick) {
+                    ctx.strokeStyle = '#2196F3'; // Blue highlight for hover
+                    ctx.lineWidth = 3;
+                    ctx.fillStyle = '#e3f2fd'; // Light blue fill for hover
+                } else {
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = variable.isHovered ? '#e0e0e0' : '#ffffff';
+                }
+                variable.draw(ctx);
+            });
+
+            // Draw grey overlay and connection points when drawing arrows
+            if (isDrawingArrow && startVariable) {
+                const hoveredVariable = activeVariables.find(variable => variable.isHovered);
+                const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(
+                    lastMouseX - canvas.getBoundingClientRect().left,
+                    lastMouseY - canvas.getBoundingClientRect().top
+                ) : null;
+
+                // Draw all available connection points
+                if (!hoveredVariable) {
+                    // Draw variable connection points
+                    activeVariables.forEach(variable => {
+                        if (!connectionExists(startVariable, variable, arrowType)) {
+                            const angle = Math.atan2(
+                                variable.y + variable.radius - (startVariable.y + startVariable.radius),
+                                variable.x + variable.radius - (startVariable.x + startVariable.radius)
+                            );
+                            const point = variable.getIntersectionPoint(angle + Math.PI);
+                            drawConnectionPoint(point.x, point.y);
+                        }
+                    });
+
+                    // Draw arrow midpoints
+                    arrows.forEach(arrow => {
+                        if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
+                            const midpoint = arrow.getMidpoint();
+                            drawConnectionPoint(midpoint.x, midpoint.y);
+                        }
+                    });
+                }
+
+                if (!hoveredVariable && !hoveredArrow) {
+                    // Draw semi-transparent grey overlay
+                    ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+        }
+
+        // Helper function to draw connection points
+        function drawConnectionPoint(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#4CAF50';
+            ctx.fill();
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Add toggle equations functionality
+        document.getElementById('toggleEquations').addEventListener('click', () => {
+            const panel = document.getElementById('equationsPanel');
+            const button = document.getElementById('toggleEquations');
+            panel.classList.toggle('hidden');
+            button.textContent = panel.classList.contains('hidden') ? 'Show Equations' : 'Hide Equations';
+        });
+
+        // Helper function to update equation with new term
+        function updateEquationWithArrow(startVar, endVar, type) {
+            console.log('Updating equation:', { startVar, endVar, type });
+            
+            // Get the target variable for the equation
+            const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
+            
+            // Initialize terms array if it doesn't exist
+            if (!equations.has(targetVar.text)) {
+                equations.set(targetVar.text, []);
+            }
+            
+            let terms = equations.get(targetVar.text);
+            
+            // Create new term
+            const newTerm = new Term(startVar, targetVar, type);
+            
+            // Find existing terms for the target variable that are part of an AND group
+            const existingAndTerms = terms.filter(term => term.logicType === 'and');
+            
+            let groupId;
+            if (existingAndTerms.length > 0) {
+                // Add to existing AND group
+                groupId = existingAndTerms[0].logicGroup;
+                newTerm.logicGroup = groupId;
+                newTerm.logicType = 'and';
+                
+                // Ensure all related terms are in the same group
+                existingAndTerms.forEach(term => {
+                    term.logicGroup = groupId;
+                    term.logicType = 'and';
+                });
+                    } else {
+                // Create a new AND group
+                groupId = Date.now();
+                newTerm.logicGroup = groupId;
+                newTerm.logicType = 'and';
+            }
+            
+            terms.push(newTerm);
+            equations.set(targetVar.text, terms);
+                        updateEquationsList();
+                        
+            // Set the AND group ID for the arrow
+            const newArrow = arrows[arrows.length - 1];
+            if (newArrow) {
+                newArrow.isAndConnection = true;
+                newArrow.andGroupId = groupId;
+            }
+        }
 
     // Add after the Term class and before the DOMContentLoaded event listener
 
@@ -1517,7 +1517,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const variable of this.equations.keys()) {
                     const currentValue = state.get(variable) || 0;
                     const derivative = this.evaluateEquation(variable, state);
-                    const newValue = currentValue + derivative * dt;
+                    let newValue = currentValue + derivative * dt;
+                    // Ensure value doesn't go below 0
+                    newValue = Math.max(0, newValue);
                     newState.set(variable, newValue);
                     this.results.get(variable).push(newValue);
                 }
