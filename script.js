@@ -763,17 +763,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set canvas size
     function resizeCanvas() {
         const container = canvas.parentElement;
-        const controlsHeight = container.querySelector('.controls').offsetHeight;
         const padding = 40; // 20px top + 20px bottom padding
         
-        // Set canvas size to match container width minus padding
-        canvas.width = container.clientWidth - 40; // Account for left/right padding
-        canvas.height = 600; // Fixed height
+        // Calculate available width and height
+        const availableWidth = container.clientWidth - padding;
+        const availableHeight = 600; // Fixed height for canvas
+        
+        // Set canvas dimensions
+        canvas.width = availableWidth;
+        canvas.height = availableHeight;
+        
+        // Set the display size to match the container
+        canvas.style.width = `${availableWidth}px`;
+        canvas.style.height = `${availableHeight}px`;
         
         // Log canvas dimensions for debugging
         console.log('Canvas dimensions:', {
             width: canvas.width,
             height: canvas.height,
+            styleWidth: canvas.style.width,
+            styleHeight: canvas.style.height,
             containerWidth: container.clientWidth,
             containerHeight: container.clientHeight
         });
@@ -1052,8 +1061,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Mouse event handlers
     canvas.addEventListener('mousedown', (e) => {
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
 
         if (isDrawingArrow) {
             startVariable = activeVariables.find(variable => variable.isPointInside(x - panOffsetX, y - panOffsetY));
@@ -1082,8 +1093,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
 
         // Store last mouse position for drawing arrows
         lastMouseX = x;
@@ -1162,8 +1175,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('mouseup', (e) => {
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
 
         if (isPanning) {
             isPanning = false;
@@ -1328,43 +1343,43 @@ document.addEventListener('DOMContentLoaded', () => {
         //     mouseX + 10, 
         //     mouseY - 10);
 
-            // Draw grey overlay and connection points when drawing arrows
-            if (isDrawingArrow && startVariable) {
-                const hoveredVariable = activeVariables.find(variable => variable.isHovered);
-                const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(
-                    lastMouseX - canvas.getBoundingClientRect().left - panOffsetX,
-                    lastMouseY - canvas.getBoundingClientRect().top - panOffsetY
-                ) : null;
+        // Draw grey overlay and connection points when drawing arrows
+        if (isDrawingArrow && startVariable) {
+            const hoveredVariable = activeVariables.find(variable => variable.isHovered);
+            const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(
+                lastMouseX - canvas.getBoundingClientRect().left - panOffsetX,
+                lastMouseY - canvas.getBoundingClientRect().top - panOffsetY
+            ) : null;
 
-                // Draw all available connection points
-                if (!hoveredVariable) {
-                    // Draw variable connection points
-                    activeVariables.forEach(variable => {
-                        if (!connectionExists(startVariable, variable, arrowType)) {
-                            const angle = Math.atan2(
-                                variable.y + variable.radius - (startVariable.y + startVariable.radius),
-                                variable.x + variable.radius - (startVariable.x + startVariable.radius)
-                            );
-                            const point = variable.getIntersectionPoint(angle + Math.PI);
-                            drawConnectionPoint(ctx, point.x, point.y);
-                        }
-                    });
+            // Draw all available connection points
+            if (!hoveredVariable) {
+                // Draw variable connection points
+                activeVariables.forEach(variable => {
+                    if (!connectionExists(startVariable, variable, arrowType)) {
+                        const angle = Math.atan2(
+                            variable.y + variable.radius - (startVariable.y + startVariable.radius),
+                            variable.x + variable.radius - (startVariable.x + startVariable.radius)
+                        );
+                        const point = variable.getIntersectionPoint(angle + Math.PI);
+                        drawConnectionPoint(ctx, point.x, point.y);
+                    }
+                });
 
-                    // Draw arrow midpoints
-                    arrows.forEach(arrow => {
-                        if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
-                            const midpoint = arrow.getMidpoint();
-                            drawConnectionPoint(ctx, midpoint.x, midpoint.y);
-                        }
-                    });
-                }
-
-                if (!hoveredVariable && !hoveredArrow) {
-                    // Draw semi-transparent grey overlay
-                    ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
-                    ctx.fillRect(-panOffsetX, -panOffsetY, canvas.width, canvas.height);
-                }
+                // Draw arrow midpoints
+                arrows.forEach(arrow => {
+                    if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
+                        const midpoint = arrow.getMidpoint();
+                        drawConnectionPoint(ctx, midpoint.x, midpoint.y);
+                    }
+                });
             }
+
+            if (!hoveredVariable && !hoveredArrow) {
+                // Draw semi-transparent grey overlay
+                ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+                ctx.fillRect(-panOffsetX, -panOffsetY, canvas.width, canvas.height);
+            }
+        }
 
         // Restore the context state
         ctx.restore();
