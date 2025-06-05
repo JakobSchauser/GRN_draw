@@ -22,6 +22,8 @@ h1 {
     margin: 0 auto;
     position: relative;
     min-height: 600px;
+    display: flex;
+    gap: 20px;
 }
 
 .canvas-container {
@@ -29,108 +31,40 @@ h1 {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    width: 100%;
-    transition: width 0.3s ease-in-out;
+    flex: 1;
 }
 
 .equations-panel {
-    width: 400px;
+    width: 800px;
     background: white;
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    position: absolute;
-    right: 20px;
-    top: 20px;
-    bottom: 20px;
+    height: 640px;
     overflow-y: auto;
     transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
     transform: translateX(0);
+    z-index: 100;
+    flex-shrink: 0;
 }
 
 .equations-panel.hidden {
-    transform: translateX(120%);
+    transform: translateX(calc(100% + 20px));
     opacity: 0;
 }
 
-.equations-panel:not(.hidden) ~ .canvas-container {
-    width: calc(100% - 420px);
+.equations-panel:not(.hidden) {
+    /* This rule is just to clarify intent, flex-shrink: 0 is the main point */
+    /* It occupies its defined width (800px) within the flex container */
 }
 
-.equations-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #eee;
-    padding-bottom: 10px;
-    gap: 10px;
-}
-
-.equations-header h2 {
-    margin: 0;
-    font-size: 1.2em;
-}
-
-.close-button {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: #666;
-    cursor: pointer;
-    padding: 0;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-}
-
-.close-button:hover {
-    background-color: #f0f0f0;
-    color: #333;
-}
-
-.toggle-button {
-    background-color: #2196F3;
-    white-space: nowrap;
-}
-
-.toggle-button:hover {
-    background-color: #1976D2;
-}
-
-#equationsList {
-    margin-bottom: 20px;
-    min-height: 200px;
-}
-
-.equation-input {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-#equationInput {
-    padding: 8px;
+canvas {
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 14px;
-}
-
-#addEquation {
-    padding: 8px 16px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-#addEquation:hover {
-    background-color: #45a049;
+    width: 100%;
+    height: 600px;
+    background-color: white;
+    display: block;
 }
 
 .controls {
@@ -170,13 +104,110 @@ button:hover {
     background-color: #d32f2f;
 }
 
-canvas {
+#toggleEquations {
+    background-color: #800080;
+    color: white;
+}
+
+#toggleEquations:hover {
+    background-color: #600060;
+}
+
+.equations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+    gap: 10px;
+}
+
+.equations-content {
+    display: flex;
+    gap: 20px;
+    height: calc(100% - 60px);
+}
+
+.equations-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+
+.equations-column:last-child {
+    flex: 1.5;
+}
+
+.equations-column h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.1em;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+#equationsList {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+#initialConditionsList, #parametersList {
+    overflow-y: auto;
+    max-height: 150px;
+}
+
+#simulationResults {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#simulationPlot {
+    flex: 1;
+    min-height: 300px;
+    background: white;
     border: 1px solid #ddd;
     border-radius: 4px;
-    width: 100%;
-    height: 600px;
-    background-color: white;
-    display: block;
+}
+
+.simulation-controls {
+    margin-bottom: 15px;
+}
+
+.simulation-params {
+    margin-top: 10px;
+}
+
+.parameter-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.parameter-label {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.parameter-input {
+    width: 80px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
 }
 
 .equation-item {
@@ -184,12 +215,16 @@ canvas {
     align-items: center;
     gap: 10px;
     padding: 10px;
-    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .equation-content {
     flex: 1;
     overflow-x: auto;
+    font-size: 0.9em;
 }
 
 .delete-equation {
@@ -220,39 +255,30 @@ canvas {
     background-color: #cc0000;
 }
 
-#toggleEquations {
-    background-color: #800080;
-    color: white;
-}
-
-#toggleEquations:hover {
-    background-color: #600060;
-}
-
 #contextMenu {
-    display: none; /* Initially hidden */
-    position: absolute; /* Position it absolutely */
-    background: white; /* Background color */
-    border: 1px solid #ccc; /* Border around the menu */
-    border-radius: 4px; /* Rounded corners */
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); /* Shadow for depth */
-    z-index: 1000; /* Ensure it appears above other elements */
-    padding: 10px; /* Padding inside the menu */
+    display: none;
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    padding: 10px;
 }
 
 #contextMenu button {
-    display: block; /* Stack buttons vertically */
-    width: 100%; /* Make buttons full width */
-    padding: 8px; /* Padding for buttons */
-    border: none; /* Remove default border */
-    background: #d0d0d0; /* Darker background color for buttons */
-    cursor: pointer; /* Pointer cursor on hover */
-    margin: 5px 0; /* Margin between buttons */
-    border-radius: 4px; /* Rounded corners for buttons */
+    display: block;
+    width: 100%;
+    padding: 8px;
+    border: none;
+    background: #d0d0d0;
+    cursor: pointer;
+    margin: 5px 0;
+    border-radius: 4px;
 }
 
 #contextMenu button:hover {
-    background: #b0b0b0; /* Change background on hover to a darker shade */
+    background: #b0b0b0;
 }
 
 .parameters-section {
@@ -268,37 +294,6 @@ canvas {
     font-size: 1.1em;
 }
 
-.parameter-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 8px;
-    background: white;
-    border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.parameter-label {
-    flex: 1;
-    font-family: 'Courier New', monospace;
-    font-size: 0.9em;
-}
-
-.parameter-input {
-    width: 100px;
-    padding: 4px 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 0.9em;
-}
-
-.parameter-input:focus {
-    outline: none;
-    border-color: #2196F3;
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
-}
-
 .simulation-section {
     margin-top: 20px;
     padding: 15px;
@@ -310,13 +305,6 @@ canvas {
     margin-bottom: 15px;
     color: #333;
     font-size: 1.1em;
-}
-
-.simulation-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    margin-bottom: 20px;
 }
 
 .simulation-button {
@@ -332,33 +320,4 @@ canvas {
 
 .simulation-button:hover {
     background-color: #1976D2;
-}
-
-.simulation-params {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.simulation-params label {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-}
-
-.simulation-params input {
-    width: 100px;
-    padding: 4px 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-#simulationPlot {
-    width: 100%;
-    height: 300px;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-top: 15px;
 } 

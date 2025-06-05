@@ -41,32 +41,35 @@
             <div class="equations-header">
                 <h2>Differential Equations</h2>
             </div>
-            <div id="equationsList"></div>
-            <div class="parameters-section">
-                <h3>Initial Conditions</h3>
-                <div id="initialConditionsList"></div>
-            </div>
-            <div class="parameters-section">
-                <h3>Parameters</h3>
-                <div id="parametersList"></div>
-            </div>
-            <div class="simulation-section">
-                <h3>Simulation</h3>
-                <div class="simulation-controls">
-                    <button id="runSimulation" class="simulation-button">Run Simulation</button>
-                    <div class="simulation-params">
-                        <label>
-                            Time Steps:
-                            <input type="number" id="timeSteps" value="1000" min="100" step="100">
-                        </label>
-                        <label>
-                            Time Step Size:
-                            <input type="number" id="timeStepSize" value="0.01" min="0.001" step="0.001">
-                        </label>
-                    </div>
+            <div class="equations-content">
+                <div class="equations-column">
+                    <h3>Equations</h3>
+                    <div id="equationsList"></div>
                 </div>
-                <div id="simulationResults">
-                    <canvas id="simulationPlot"></canvas>
+                <div class="equations-column">
+                    <h3>Initial Conditions</h3>
+                    <div id="initialConditionsList"></div>
+                    <h3>Parameters</h3>
+                    <div id="parametersList"></div>
+                </div>
+                <div class="equations-column">
+                    <h3>Simulation</h3>
+                    <div class="simulation-controls">
+                        <button id="runSimulation" class="simulation-button">Run Simulation</button>
+                        <div class="simulation-params">
+                            <label>
+                                Time Steps:
+                                <input type="number" id="timeSteps" value="1000" min="100" step="100">
+                            </label>
+                            <label>
+                                Time Step Size:
+                                <input type="number" id="timeStepSize" value="0.01" min="0.001" step="0.001">
+                            </label>
+                        </div>
+                    </div>
+                    <div id="simulationResults">
+                        <canvas id="simulationPlot"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
