@@ -762,8 +762,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set canvas size
     function resizeCanvas() {
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
+        const container = canvas.parentElement;
+        const controlsHeight = container.querySelector('.controls').offsetHeight;
+        const padding = 40; // 20px top + 20px bottom padding
+        
+        // Set canvas size to match container width minus padding
+        canvas.width = container.clientWidth - 40; // Account for left/right padding
+        canvas.height = 600; // Fixed height
+        
+        // Log canvas dimensions for debugging
+        console.log('Canvas dimensions:', {
+            width: canvas.width,
+            height: canvas.height,
+            containerWidth: container.clientWidth,
+            containerHeight: container.clientHeight
+        });
+        
         redraw();
     }
 
@@ -1071,6 +1085,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        // Store last mouse position for drawing arrows
+        lastMouseX = x;
+        lastMouseY = y;
+
         if (isPanning) {
             // Update pan offset
             panOffsetX += x - panStartX;
@@ -1283,312 +1301,73 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillStyle = variable.isHovered ? '#e0e0e0' : '#ffffff';
             }
             variable.draw(ctx);
+
+            // Draw debug info for each variable
+            // ctx.fillStyle = '#000000';
+            // ctx.font = '12px Arial';
+            // ctx.textAlign = 'left';
+            // ctx.fillText(`Node ${variable.text}: (${Math.round(variable.x)}, ${Math.round(variable.y)})`, 
+            //     variable.x + variable.radius + 5, 
+            //     variable.y + variable.radius);
         });
 
-        // Draw grey overlay and connection points when drawing arrows
-        if (isDrawingArrow && startVariable) {
-            const hoveredVariable = activeVariables.find(variable => variable.isHovered);
-            const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(
-                lastMouseX - canvas.getBoundingClientRect().left - panOffsetX,
-                lastMouseY - canvas.getBoundingClientRect().top - panOffsetY
-            ) : null;
+        // Draw debug info for mouse position
+        // const rect = canvas.getBoundingClientRect();
+        // const mouseX = lastMouseX - panOffsetX;
+        // const mouseY = lastMouseY - panOffsetY;
+        
+        // ctx.fillStyle = '#ff0000';
+        // ctx.beginPath();
+        // ctx.arc(mouseX, mouseY, 5, 0, Math.PI * 2);
+        // ctx.fill();
+        
+        // ctx.fillStyle = '#000000';
+        // ctx.font = '12px Arial';
+        // ctx.textAlign = 'left';
+        // ctx.fillText(`Mouse: (${Math.round(mouseX)}, ${Math.round(mouseY)})`, 
+        //     mouseX + 10, 
+        //     mouseY - 10);
 
-            // Draw all available connection points
-            if (!hoveredVariable) {
-                // Draw variable connection points
-                activeVariables.forEach(variable => {
-                    if (!connectionExists(startVariable, variable, arrowType)) {
-                        const angle = Math.atan2(
-                            variable.y + variable.radius - (startVariable.y + startVariable.radius),
-                            variable.x + variable.radius - (startVariable.x + startVariable.radius)
-                        );
-                        const point = variable.getIntersectionPoint(angle + Math.PI);
-                        drawConnectionPoint(ctx, point.x, point.y);
-                    }
-                });
+            // Draw grey overlay and connection points when drawing arrows
+            if (isDrawingArrow && startVariable) {
+                const hoveredVariable = activeVariables.find(variable => variable.isHovered);
+                const hoveredArrow = !hoveredVariable ? findArrowUnderPoint(
+                    lastMouseX - canvas.getBoundingClientRect().left - panOffsetX,
+                    lastMouseY - canvas.getBoundingClientRect().top - panOffsetY
+                ) : null;
 
-                // Draw arrow midpoints
-                arrows.forEach(arrow => {
-                    if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
-                        const midpoint = arrow.getMidpoint();
-                        drawConnectionPoint(ctx, midpoint.x, midpoint.y);
-                    }
-                });
+                // Draw all available connection points
+                if (!hoveredVariable) {
+                    // Draw variable connection points
+                    activeVariables.forEach(variable => {
+                        if (!connectionExists(startVariable, variable, arrowType)) {
+                            const angle = Math.atan2(
+                                variable.y + variable.radius - (startVariable.y + startVariable.radius),
+                                variable.x + variable.radius - (startVariable.x + startVariable.radius)
+                            );
+                            const point = variable.getIntersectionPoint(angle + Math.PI);
+                            drawConnectionPoint(ctx, point.x, point.y);
+                        }
+                    });
+
+                    // Draw arrow midpoints
+                    arrows.forEach(arrow => {
+                        if (!connectionExists(startVariable, arrow, arrowType) && !sharesStartNode(startVariable, arrow)) {
+                            const midpoint = arrow.getMidpoint();
+                            drawConnectionPoint(ctx, midpoint.x, midpoint.y);
+                        }
+                    });
+                }
+
+                if (!hoveredVariable && !hoveredArrow) {
+                    // Draw semi-transparent grey overlay
+                    ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+                    ctx.fillRect(-panOffsetX, -panOffsetY, canvas.width, canvas.height);
+                }
             }
-
-            if (!hoveredVariable && !hoveredArrow) {
-                // Draw semi-transparent grey overlay
-                ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
-                ctx.fillRect(-panOffsetX, -panOffsetY, canvas.width, canvas.height);
-            }
-        }
 
         // Restore the context state
         ctx.restore();
-    }
-
-    // Add toggle equations functionality
-    document.getElementById('toggleEquations').addEventListener('click', () => {
-        const panel = document.getElementById('equationsPanel');
-        const button = document.getElementById('toggleEquations');
-        // const container = document.querySelector('.container'); // Get the container - no longer needed
-        
-        panel.classList.toggle('hidden');
-        // container.classList.toggle('equations-panel-visible', !panel.classList.contains('hidden')); // Toggle class on container - no longer needed
-
-        button.textContent = panel.classList.contains('hidden') ? 'Show Equations' : 'Hide Equations';
-    });
-
-    // Helper function to update equation with new term
-    function updateEquationWithArrow(startVar, endVar, type) {
-        console.log('Updating equation:', { startVar, endVar, type });
-        
-        // Get the target variable for the equation
-        const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
-        
-        // Initialize terms array if it doesn't exist
-        if (!equations.has(targetVar.text)) {
-            equations.set(targetVar.text, []);
-        }
-        
-        let terms = equations.get(targetVar.text);
-        
-        // Create new term
-        const newTerm = new Term(startVar, targetVar, type);
-        
-        // Find existing terms for the target variable that are part of an AND group
-        const existingAndTerms = terms.filter(term => term.logicType === 'and');
-        
-        let groupId;
-        if (existingAndTerms.length > 0) {
-            // Add to existing AND group
-            groupId = existingAndTerms[0].logicGroup;
-            newTerm.logicGroup = groupId;
-            newTerm.logicType = 'and';
-            
-            // Ensure all related terms are in the same group
-            existingAndTerms.forEach(term => {
-                term.logicGroup = groupId;
-                term.logicType = 'and';
-            });
-        } else {
-            // Create a new AND group
-            groupId = Date.now();
-            newTerm.logicGroup = groupId;
-            newTerm.logicType = 'and';
-        }
-        
-        terms.push(newTerm);
-        equations.set(targetVar.text, terms);
-        updateEquationsList();
-        
-        // Set the AND group ID for the arrow
-        const newArrow = arrows[arrows.length - 1];
-        if (newArrow) {
-            newArrow.isAndConnection = true;
-            newArrow.andGroupId = groupId;
-        }
-    }
-
-    // Add after the Term class and before the DOMContentLoaded event listener
-
-    class Simulation {
-        constructor(equations, initialConditions, parameters) {
-            this.equations = equations;
-            this.initialConditions = initialConditions;
-            this.parameters = parameters;
-            this.results = new Map();
-            this.timePoints = [];
-        }
-
-        evaluateTerm(term, state) {
-            if (term.isConstant) {
-                const c = this.parameters.get(`c_${term.coefficientId}`) || 1;
-                return term.type === 'promote' ? c : -c;
-            }
-
-            const c = this.parameters.get(`c_${term.coefficientId}`) || 1;
-            const isArrowToArrow = term.sourceVar instanceof Arrow;
-            const sourceVar = isArrowToArrow ? term.sourceVar.startVariable.text : term.sourceVar.text;
-            const sourceValue = state.get(sourceVar) || 0;
-            const targetValue = state.get(term.targetVar.text) || 0;
-
-            if (term.type === 'promote') {
-                const k = this.parameters.get(`k_${term.kmId}`) || 1;
-                return c * Math.pow(sourceValue, 2) / (k + Math.pow(sourceValue, 2));
-            } else {
-                // Negative coefficient term with both source and target variables
-                return -c * sourceValue * targetValue;
-            }
-        }
-
-        evaluateEquation(variable, state) {
-            const terms = this.equations.get(variable) || [];
-            
-            // Handle AND logic groups
-            const processedTerms = new Set();
-            let result = 0;
-            
-            for (const term of terms) {
-                // Skip if we've already processed this term as part of a group
-                if (processedTerms.has(term)) continue;
-                
-                if (term.logicGroup !== null) {
-                    // Find all terms in this logic group
-                    const groupTerms = terms.filter(t => t.logicGroup === term.logicGroup);
-                    groupTerms.forEach(t => processedTerms.add(t));
-                    
-                    if (term.logicType === 'and') {
-                        // For AND logic, multiply the terms
-                        const groupResult = groupTerms.reduce((product, t) => {
-                            const termValue = this.evaluateTerm(t, state);
-                            return product * termValue;
-                        }, 1);
-                        result += groupResult;
-                    } else {
-                        // For OR logic, add the terms
-                        const groupResult = groupTerms.reduce((sum, t) => {
-                            const termValue = this.evaluateTerm(t, state);
-                            return sum + termValue;
-                        }, 0);
-                        result += groupResult;
-                    }
-                } else {
-                    // Handle individual terms
-                    processedTerms.add(term);
-                    result += this.evaluateTerm(term, state);
-                }
-            }
-            
-            return result;
-        }
-
-        run(numSteps, dt) {
-            // Initialize results
-            this.timePoints = Array.from({ length: numSteps + 1 }, (_, i) => i * dt);
-            this.results.clear();
-            
-            // Initialize state with initial conditions
-            const state = new Map(this.initialConditions);
-            
-            // Initialize arrays for all variables in equations
-            for (const variable of this.equations.keys()) {
-                this.results.set(variable, []);
-            }
-            
-            // Store initial values
-            for (const [variable, value] of state) {
-                if (this.results.has(variable)) {
-                    this.results.get(variable).push(value);
-                }
-            }
-
-            // Run simulation
-            for (let step = 0; step < numSteps; step++) {
-                const newState = new Map();
-                
-                // Calculate new values for each variable
-                for (const variable of this.equations.keys()) {
-                    const currentValue = state.get(variable) || 0;
-                    const derivative = this.evaluateEquation(variable, state);
-                    let newValue = currentValue + derivative * dt;
-                    // Ensure value doesn't go below 0
-                    newValue = Math.max(0, newValue);
-                    newState.set(variable, newValue);
-                    this.results.get(variable).push(newValue);
-                }
-                
-                // Update state
-                for (const [variable, value] of newState) {
-                    state.set(variable, value);
-                }
-            }
-        }
-
-        plot(canvas) {
-            const ctx = canvas.getContext('2d');
-            const width = canvas.width;
-            const height = canvas.height;
-            const padding = 40;
-
-            // Clear canvas
-            ctx.clearRect(0, 0, width, height);
-
-            // Find min and max values for scaling
-            let minY = Infinity;
-            let maxY = -Infinity;
-            for (const values of this.results.values()) {
-                minY = Math.min(minY, ...values);
-                maxY = Math.max(maxY, ...values);
-            }
-            minY = Math.min(0, minY); // Include 0 in the range
-            maxY = Math.max(0, maxY);
-
-            // Add some padding to the y-range
-            const yRange = maxY - minY;
-            minY -= yRange * 0.1;
-            maxY += yRange * 0.1;
-
-            // Draw axes
-            ctx.beginPath();
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
-            
-            // X-axis
-            ctx.moveTo(padding, height - padding);
-            ctx.lineTo(width - padding, height - padding);
-            
-            // Y-axis
-            ctx.moveTo(padding, padding);
-            ctx.lineTo(padding, height - padding);
-            ctx.stroke();
-
-            // Draw time labels
-            ctx.fillStyle = '#000';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            const maxTime = this.timePoints[this.timePoints.length - 1];
-            for (let t = 0; t <= maxTime; t += maxTime / 5) {
-                const x = padding + (t / maxTime) * (width - 2 * padding);
-                ctx.fillText(t.toFixed(1), x, height - padding + 5);
-            }
-
-            // Draw value labels
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            for (let v = Math.ceil(minY); v <= Math.floor(maxY); v++) {
-                const y = height - padding - ((v - minY) / (maxY - minY)) * (height - 2 * padding);
-                ctx.fillText(v.toString(), padding - 5, y);
-            }
-
-            // Draw curves
-            const colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF', '#FFA500'];
-            let colorIndex = 0;
-
-            for (const [variable, values] of this.results) {
-                ctx.beginPath();
-                ctx.strokeStyle = colors[colorIndex % colors.length];
-                ctx.lineWidth = 2;
-
-                values.forEach((value, i) => {
-                    const x = padding + (this.timePoints[i] / maxTime) * (width - 2 * padding);
-                    const y = height - padding - ((value - minY) / (maxY - minY)) * (height - 2 * padding);
-                    if (i === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                });
-
-                ctx.stroke();
-
-                // Draw legend
-                ctx.fillStyle = colors[colorIndex % colors.length];
-                ctx.textAlign = 'left';
-                ctx.fillText(variable, padding + 10, padding + colorIndex * 20);
-                colorIndex++;
-            }
-        }
     }
 
     // Add to the DOMContentLoaded event listener, after the existing code
@@ -1608,7 +1387,27 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.height = canvas.offsetHeight;
         simulation.plot(canvas);
     });
-}); 
+
+    // Add to the DOMContentLoaded event listener, after the existing code
+    document.getElementById('toggleEquations').addEventListener('click', () => {
+        const simulationPanel = document.getElementById('simulationPanel');
+        const simulationControlsPanel = document.getElementById('simulationControlsPanel');
+        const button = document.getElementById('toggleEquations');
+        
+        if (simulationPanel.classList.contains('hidden')) {
+            simulationPanel.classList.remove('hidden');
+            simulationControlsPanel.classList.remove('hidden');
+            button.textContent = 'Hide Simulation';
+        } else {
+            simulationPanel.classList.add('hidden');
+            simulationControlsPanel.classList.add('hidden');
+            button.textContent = 'Show Simulation';
+        }
+        
+        // Resize canvas after showing/hiding panels
+        resizeCanvas();
+    });
+});
 
 // Add a helper function to check if a connection already exists
 function connectionExists(startVar, endVar, type) {
@@ -1643,4 +1442,204 @@ function findArrowUnderPoint(x, y) {
         }
     }
     return null;
+}
+
+// Simulation class definition
+class Simulation {
+    constructor(equations, initialConditions, parameters) {
+        this.equations = equations;
+        this.initialConditions = initialConditions;
+        this.parameters = parameters;
+        this.results = new Map();
+        this.timePoints = [];
+    }
+
+    evaluateTerm(term, state) {
+        if (term.isConstant) {
+            const c = this.parameters.get(`c_${term.coefficientId}`) || 1;
+            return term.type === 'promote' ? c : -c;
+        }
+
+        const c = this.parameters.get(`c_${term.coefficientId}`) || 1;
+        const isArrowToArrow = term.sourceVar instanceof Arrow;
+        const sourceVar = isArrowToArrow ? term.sourceVar.startVariable.text : term.sourceVar.text;
+        const sourceValue = state.get(sourceVar) || 0;
+        const targetValue = state.get(term.targetVar.text) || 0;
+
+        if (term.type === 'promote') {
+            const k = this.parameters.get(`k_${term.kmId}`) || 1;
+            return c * Math.pow(sourceValue, 2) / (k + Math.pow(sourceValue, 2));
+        } else {
+            // Negative coefficient term with both source and target variables
+            return -c * sourceValue * targetValue;
+        }
+    }
+
+    evaluateEquation(variable, state) {
+        const terms = this.equations.get(variable) || [];
+        
+        // Handle AND logic groups
+        const processedTerms = new Set();
+        let result = 0;
+        
+        for (const term of terms) {
+            // Skip if we've already processed this term as part of a group
+            if (processedTerms.has(term)) continue;
+            
+            if (term.logicGroup !== null) {
+                // Find all terms in this logic group
+                const groupTerms = terms.filter(t => t.logicGroup === term.logicGroup);
+                groupTerms.forEach(t => processedTerms.add(t));
+                
+                if (term.logicType === 'and') {
+                    // For AND logic, multiply the terms
+                    const groupResult = groupTerms.reduce((product, t) => {
+                        const termValue = this.evaluateTerm(t, state);
+                        return product * termValue;
+                    }, 1);
+                    result += groupResult;
+                } else {
+                    // For OR logic, add the terms
+                    const groupResult = groupTerms.reduce((sum, t) => {
+                        const termValue = this.evaluateTerm(t, state);
+                        return sum + termValue;
+                    }, 0);
+                    result += groupResult;
+                }
+            } else {
+                // Handle individual terms
+                processedTerms.add(term);
+                result += this.evaluateTerm(term, state);
+            }
+        }
+        
+        return result;
+    }
+
+    run(numSteps, dt) {
+        // Initialize results
+        this.timePoints = Array.from({ length: numSteps + 1 }, (_, i) => i * dt);
+        this.results.clear();
+        
+        // Initialize state with initial conditions
+        const state = new Map(this.initialConditions);
+        
+        // Initialize arrays for all variables in equations
+        for (const variable of this.equations.keys()) {
+            this.results.set(variable, []);
+        }
+        
+        // Store initial values
+        for (const [variable, value] of state) {
+            if (this.results.has(variable)) {
+                this.results.get(variable).push(value);
+            }
+        }
+
+        // Run simulation
+        for (let step = 0; step < numSteps; step++) {
+            const newState = new Map();
+            
+            // Calculate new values for each variable
+            for (const variable of this.equations.keys()) {
+                const currentValue = state.get(variable) || 0;
+                const derivative = this.evaluateEquation(variable, state);
+                let newValue = currentValue + derivative * dt;
+                // Ensure value doesn't go below 0
+                newValue = Math.max(0, newValue);
+                newState.set(variable, newValue);
+                this.results.get(variable).push(newValue);
+            }
+            
+            // Update state
+            for (const [variable, value] of newState) {
+                state.set(variable, value);
+            }
+        }
+    }
+
+    plot(canvas) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const padding = 40;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+
+        // Find min and max values for scaling
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const values of this.results.values()) {
+            minY = Math.min(minY, ...values);
+            maxY = Math.max(maxY, ...values);
+        }
+        minY = Math.min(0, minY); // Include 0 in the range
+        maxY = Math.max(0, maxY);
+
+        // Add some padding to the y-range
+        const yRange = maxY - minY;
+        minY -= yRange * 0.1;
+        maxY += yRange * 0.1;
+
+        // Draw axes
+        ctx.beginPath();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        
+        // X-axis
+        ctx.moveTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        
+        // Y-axis
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.stroke();
+
+        // Draw time labels
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const maxTime = this.timePoints[this.timePoints.length - 1];
+        for (let t = 0; t <= maxTime; t += maxTime / 5) {
+            const x = padding + (t / maxTime) * (width - 2 * padding);
+            ctx.fillText(t.toFixed(1), x, height - padding + 5);
+        }
+
+        // Draw value labels
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let v = Math.ceil(minY); v <= Math.floor(maxY); v++) {
+            const y = height - padding - ((v - minY) / (maxY - minY)) * (height - 2 * padding);
+            ctx.fillText(v.toString(), padding - 5, y);
+        }
+
+        // Draw curves
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF', '#FFA500'];
+        let colorIndex = 0;
+
+        for (const [variable, values] of this.results) {
+            ctx.beginPath();
+            ctx.strokeStyle = colors[colorIndex % colors.length];
+            ctx.lineWidth = 2;
+
+            values.forEach((value, i) => {
+                const x = padding + (this.timePoints[i] / maxTime) * (width - 2 * padding);
+                const y = height - padding - ((value - minY) / (maxY - minY)) * (height - 2 * padding);
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+
+            // Draw legend
+            ctx.fillStyle = colors[colorIndex % colors.length];
+            ctx.textAlign = 'left';
+            ctx.fillText(variable, padding + 10, padding + colorIndex * 20);
+            colorIndex++;
+        }
+    }
 } 
