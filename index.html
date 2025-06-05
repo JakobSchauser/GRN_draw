@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GRN Drawing Tool</title>
+    <title>Dynamical Systems Tool</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Add MathJax with configuration -->
     <script>
@@ -17,9 +17,12 @@
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-    <h1>GRN Drawing Tool</h1>
+    <h1>Dynamical Systems Tool</h1>
     <div class="container">
         <div class="canvas-panel">
+            <div class="equations-header">
+                <h2>Canvas</h2>
+            </div>
             <div class="canvas-frame">
                 <canvas id="mainCanvas"></canvas>
             </div>
@@ -45,14 +48,13 @@
             </div>
             <div class="equations-content">
                 <div class="equations-column">
-                    <h3>Equations</h3>
                     <div id="equationsList"></div>
                 </div>
             </div>
         </div>
         <div class="simulation-panel hidden" id="simulationPanel">
             <div class="equations-header">
-                <h2>Simulation</h2>
+                <h2>Simulation Controls</h2>
             </div>
             <div class="equations-content">
                 <div class="equations-column">
@@ -65,7 +67,7 @@
         </div>
         <div class="simulation-panel hidden" id="simulationControlsPanel">
             <div class="equations-header">
-                <h2>Simulation Controls</h2>
+                <h2>Simulation</h2>
             </div>
             <div class="equations-content">
                 <div class="equations-column">

@@ -159,80 +159,95 @@ function getNextKM() {
 
 // Function to calculate equations from scratch based on arrows
 function calculateEquationsFromArrows() {
-    // Store existing constant terms
-    const constantTerms = new Map();
-    equations.forEach((terms, variable) => {
-        const constants = terms.filter(term => term.isConstant);
-        if (constants.length > 0) {
-            constantTerms.set(variable, constants);
-        }
+    const equations = new Map();
+
+    // Initialize equations map with all active variables and empty terms
+    activeVariables.forEach(variable => {
+        equations.set(variable.text, []);
     });
 
-    // Clear existing equations
-    equations.clear();
-    
-    // Group arrows by their target variable
-    const arrowsByTarget = new Map();
-    
     arrows.forEach(arrow => {
-        const targetVar = arrow.endVariable instanceof Arrow ? 
-            arrow.endVariable.endVariable : arrow.endVariable;
-            
-        if (!arrowsByTarget.has(targetVar)) {
-            arrowsByTarget.set(targetVar, []);
+        const startVar = arrow.startVariable;
+        const endVar = arrow.endVariable;
+        const type = arrow.type;
+
+        // If arrow ends on another arrow, find the final target variable
+        const targetVar = endVar instanceof Arrow ? endVar.endVariable : endVar;
+
+        // Ensure the target variable exists in the equations map
+        if (!equations.has(targetVar.text)) {
+             equations.set(targetVar.text, []);
         }
-        arrowsByTarget.get(targetVar).push(arrow);
-    });
-    
-    // For each target variable, create terms from its incoming arrows
-    arrowsByTarget.forEach((incomingArrows, targetVar) => {
-        const terms = [];
+
+        let terms = equations.get(targetVar.text);
+
+        // Create new term
+        const newTerm = new Term(startVar, targetVar, type);
         
-        // Group arrows by their AND groups
-        const andGroups = new Map();
-        incomingArrows.forEach(arrow => {
-            if (arrow.isAndConnection && arrow.andGroupId) {
-                if (!andGroups.has(arrow.andGroupId)) {
-                    andGroups.set(arrow.andGroupId, []);
-                }
-                andGroups.get(arrow.andGroupId).push(arrow);
-            } else {
-                // Single arrow terms
-                terms.push(new Term(arrow.startVariable, targetVar, arrow.type));
-            }
-        });
-        
-        // Add terms for AND groups
-        andGroups.forEach(arrows => {
-            // Create AND group for any number of arrows (including 2)
-            const groupTerms = arrows.map(arrow => 
-                new Term(arrow.startVariable, targetVar, arrow.type)
+        // Handle AND logic for arrow-to-arrow connections
+        if (arrow.isAndConnection) {
+             // Find existing terms for the target variable that are part of this AND group
+            const existingAndTerms = terms.filter(term => term.logicGroup === arrow.andGroupId);
+
+            // Add to existing AND group
+            newTerm.logicGroup = arrow.andGroupId;
+            newTerm.logicType = 'and';
+
+             // Ensure all related terms (including the new one) are in the same group
+             existingAndTerms.forEach(term => {
+                 term.logicGroup = arrow.andGroupId;
+                 term.logicType = 'and';
+             });
+
+        } else if (arrow.endVariable instanceof Arrow) {
+            // This case should now be handled by isAndConnection logic, 
+            // but keeping a fallback for clarity if needed later
+            // Should assign a new AND group if it's an arrow-to-arrow connection but not yet grouped
+             if (!newTerm.logicGroup) {
+                const newGroupId = Date.now();
+                newTerm.logicGroup = newGroupId;
+                newTerm.logicType = 'and';
+                 arrow.isAndConnection = true;
+                 arrow.andGroupId = newGroupId;
+             }
+
+        } else {
+            // Handle individual terms (non-AND connections to variables)
+            // For now, just add the term directly. 
+            // Logic for OR groups would go here if implemented.
+             // Check if a similar term already exists to avoid duplicates
+            const exists = terms.some(term => 
+                term.sourceVar === newTerm.sourceVar && 
+                term.targetVar === newTerm.targetVar && 
+                term.type === newTerm.type &&
+                term.isConstant === newTerm.isConstant &&
+                term.logicGroup === newTerm.logicGroup // Also check logic group
             );
-            
-            // Set logic group properties
-            const groupId = arrows[0].andGroupId;
-            groupTerms.forEach(term => {
-                term.logicGroup = groupId;
-                term.logicType = 'and';
-            });
-            
-            terms.push(...groupTerms);
-        });
-        
-        // Add back any constant terms for this variable
-        if (constantTerms.has(targetVar.text)) {
-            terms.push(...constantTerms.get(targetVar.text));
+
+            if (!exists) {
+                terms.push(newTerm);
+            }
+            // No need to push here if logicGroup handling is above
         }
-        
-        equations.set(targetVar.text, terms);
+
+         // Add the new term if it hasn't been added as part of a group already
+         // This needs careful handling to avoid duplicates with grouping logic above
+         const termAlreadyInGroup = terms.some(term => term === newTerm && term.logicGroup !== null);
+         if (!termAlreadyInGroup && !terms.includes(newTerm)) {
+             if (!newTerm.logicGroup) { // Only push if not part of a group handled above
+                 terms.push(newTerm);
+             } else { // If it is part of a new group, ensure it's added
+                  if (!terms.includes(newTerm)) {
+                      terms.push(newTerm);
+                  }
+             }
+         }
+
+        // Re-set the updated terms list for the target variable
+         equations.set(targetVar.text, terms);
     });
 
-    // Add equations for variables that only have constant terms
-    constantTerms.forEach((terms, variable) => {
-        if (!equations.has(variable)) {
-            equations.set(variable, terms);
-        }
-    });
+    return equations; // Return the newly calculated map
 }
 
 function updateEquationsList() {
@@ -240,10 +255,21 @@ function updateEquationsList() {
     globalCoefficientCounter = 0; // Reset coefficient counter
     globalKMCounter = 0; // Reset KM counter
 
-    // Calculate equations from scratch
-    calculateEquationsFromArrows();
+    // Calculate equations from scratch based on arrows
+    const equationsFromArrows = calculateEquationsFromArrows(); // Get equations based on arrows
 
-    // Assign IDs to all terms
+    // Create a new map including all active variables
+    const currentEquations = new Map();
+
+    // Add all active variables to the map, preserving existing terms from arrows
+    activeVariables.forEach(variable => {
+        currentEquations.set(variable.text, equationsFromArrows.get(variable.text) || []);
+    });
+
+    // Update the main equations map
+    equations = currentEquations;
+
+    // Assign IDs to all terms (now operating on the consolidated equations map)
     equations.forEach((terms, variable) => {
         terms.forEach(term => {
             if (!term.coefficientId) {
@@ -257,17 +283,19 @@ function updateEquationsList() {
     });
 
     const equationsList = document.getElementById('equationsList');
-    equationsList.innerHTML = Array.from(equations.entries()).map(([variable, terms], index) => {
-        console.log(`Generating equation for ${variable}:`, terms);
+    // Iterate through activeVariables to ensure all are displayed
+    equationsList.innerHTML = activeVariables.map(variable => {
+        const terms = equations.get(variable.text) || []; // Get terms, should exist now
+        console.log(`Generating equation for ${variable.text}:`, terms);
         return `
         <div class="equation-item">
-            <div class="equation-content">$$\\frac{d${variable}}{dt}=${terms.map((term, i) => term.toString(i === 0)).join(' ')}$$</div>
-            <button onclick="deleteEquation('${variable}')" class="delete-equation">×</button>
+            <div class="equation-content">$$\\frac{d${variable.text}}{dt}=${terms.map((term, i) => term.toString(i === 0)).join(' ')}$$</div>
+            <button onclick="deleteEquation('${variable.text}')" class="delete-equation">×</button>
         </div>
         `;
     }).join('');
 
-    // Update initial conditions list - show all variables, not just those with equations
+    // Update initial conditions list - show all variables
     const initialConditionsList = document.getElementById('initialConditionsList');
     initialConditionsList.innerHTML = activeVariables.map(variable => {
         const value = initialConditions.get(variable.text) || 1; // Default to 1 if not set
@@ -980,7 +1008,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (attempts === maxAttempts) {
                 activeVariables.push(new ActiveVariable(x, y, text));
             }
-            
+
+            updateEquationsList();
             redraw();
         }
     });
